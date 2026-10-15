@@ -7,48 +7,38 @@ class MisCreacionesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Mis creaciones')),
-    bottomNavigationBar: BottomAppBar(
-      color: AppColors.surface,
-      child: Row(
-        children: [
-          Expanded(
-            child: Tooltip(
-              message: 'Crear una criatura',
-              child: TextButton.icon(
-                onPressed: () => Navigator.pushNamed(context, '/editor'),
-                icon: const Icon(Icons.add),
-                label: const Text('Crear'),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Tooltip(
-              message: 'Compartir y recibir',
-              child: TextButton.icon(
-                onPressed: () => Navigator.pushNamed(context, '/intercambio'),
-                icon: const Icon(Icons.swap_horiz),
-                label: const Text('Compartir'),
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
     body: Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 700),
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            const Text(
-              'CREAR',
-              style: TextStyle(
-                color: AppColors.primary,
-                letterSpacing: 1.5,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Tooltip(
+                    message: 'Crear una criatura',
+                    child: TextButton.icon(
+                      onPressed: () => Navigator.pushNamed(context, '/editor'),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Crear'),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Tooltip(
+                    message: 'Compartir y recibir',
+                    child: TextButton.icon(
+                      onPressed: () =>
+                          Navigator.pushNamed(context, '/intercambio'),
+                      icon: const Icon(Icons.swap_horiz),
+                      label: const Text('Compartir'),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 24),
             const Text(
               'Crea tu criatura',
               style: TextStyle(
