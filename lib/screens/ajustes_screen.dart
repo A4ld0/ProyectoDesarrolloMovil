@@ -90,21 +90,6 @@ class _AjustesScreenState extends State<AjustesScreen> {
           child: ListView(
             padding: const EdgeInsets.all(24),
             children: [
-              Text(
-                'Personaliza tu experiencia',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  color: colors.secondary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'El tema se mantiene mientras la app está abierta. '
-                'Los demás ajustes son de prueba.',
-                style: TextStyle(color: colors.onSurfaceVariant),
-              ),
-              const SizedBox(height: 24),
               Card(
                 elevation: 0,
                 color: colors.surface,
@@ -116,9 +101,6 @@ class _AjustesScreenState extends State<AjustesScreen> {
                         color: colors.primary,
                       ),
                       title: const Text('Modo oscuro'),
-                      subtitle: Text(
-                        tema.modoOscuro ? 'Activado' : 'Desactivado',
-                      ),
                       value: tema.modoOscuro,
                       onChanged: tema.cambiarModoOscuro,
                     ),
@@ -129,11 +111,6 @@ class _AjustesScreenState extends State<AjustesScreen> {
                         color: colors.primary,
                       ),
                       title: const Text('Sonidos'),
-                      subtitle: Text(
-                        _sonidos
-                            ? 'Activados · Simulado'
-                            : 'Desactivados · Simulado',
-                      ),
                       value: _sonidos,
                       onChanged: (valor) {
                         setState(() => _sonidos = valor);
@@ -159,7 +136,6 @@ class _AjustesScreenState extends State<AjustesScreen> {
                         color: colors.primary,
                       ),
                       title: const Text('Permisos'),
-                      subtitle: const Text('Ubicación y cámara · Simulados'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => Navigator.push<void>(
                         context,
@@ -174,7 +150,6 @@ class _AjustesScreenState extends State<AjustesScreen> {
                     ListTile(
                       leading: Icon(Icons.info_outline, color: colors.primary),
                       title: const Text('Acerca de'),
-                      subtitle: const Text('Conoce la aplicación'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: _mostrarAcercaDe,
                     ),

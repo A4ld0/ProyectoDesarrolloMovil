@@ -16,7 +16,7 @@ Future<void> abrirPermisos(WidgetTester tester) async {
   await mostrar(tester, find.text('Iniciar sesión'));
   await tester.tap(find.text('Iniciar sesión'));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Continuar demo'));
+  await tester.tap(find.text('Continuar'));
   await tester.pumpAndSettle();
 }
 
@@ -60,7 +60,7 @@ void main() {
 
       await tester.tap(find.text(opcion.$1));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Continuar demo'));
+      await tester.tap(find.text('Continuar'));
       await tester.pumpAndSettle();
       expect(find.widgetWithText(AppBar, 'Permisos'), findsOneWidget);
       expect(tester.takeException(), isNull);

@@ -9,17 +9,7 @@ class InicioSesionScreen extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Funcionalidad pendiente'),
-        content: Text(
-          metodo == 'correo y contraseña'
-              ? 'Aquí se verificará tu correo y contraseña para iniciar sesión. '
-                    'La autenticación está pendiente.\n\n'
-                    'Por ahora, puedes continuar a la demostración. '
-                    'No se verifica ni se guarda ninguna credencial.'
-              : 'Aquí iniciarás sesión con tu cuenta de $metodo. '
-                    'La conexión con $metodo está pendiente.\n\n'
-                    'Por ahora, puedes continuar a la demostración '
-                    'sin conectar una cuenta.',
-        ),
+        content: Text('El acceso con $metodo está pendiente.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -27,7 +17,7 @@ class InicioSesionScreen extends StatelessWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Continuar demo'),
+            child: const Text('Continuar'),
           ),
         ],
       ),
@@ -69,12 +59,6 @@ class InicioSesionScreen extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                     color: colors.secondary,
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Inicia sesión para comenzar a explorar',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: colors.onSurfaceVariant),
                 ),
                 const SizedBox(height: 24),
                 const TextField(
@@ -133,16 +117,6 @@ class InicioSesionScreen extends StatelessWidget {
                   onPressed: () => _mostrarAcceso(context, 'Apple'),
                   icon: const Icon(Icons.apple),
                   label: const Text('Continuar con Apple'),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'Demostración · El inicio de sesión aún no está disponible. '
-                  'No necesitas introducir datos reales.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: colors.onSurfaceVariant,
-                    fontSize: 12,
-                  ),
                 ),
               ],
             ),
