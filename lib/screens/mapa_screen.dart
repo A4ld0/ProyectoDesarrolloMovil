@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../data/criaturas_demo.dart';
-import '../theme/app_colors.dart';
 
 class MapaScreen extends StatelessWidget {
   const MapaScreen({super.key});
@@ -38,11 +37,14 @@ class MapaScreen extends StatelessWidget {
                     criaturasDemo[2],
                     const Alignment(-0.35, 0.65),
                   ),
-                  const Align(
-                    alignment: Alignment(0.15, 0.3),
+                  Align(
+                    alignment: const Alignment(0.15, 0.3),
                     child: CircleAvatar(
-                      backgroundColor: AppColors.navy,
-                      child: Icon(Icons.person, color: AppColors.surface),
+                      backgroundColor: Theme.of(context).colorScheme.secondary,
+                      child: Icon(
+                        Icons.person,
+                        color: Theme.of(context).colorScheme.onSecondary,
+                      ),
                     ),
                   ),
                 ],
@@ -61,7 +63,7 @@ class MapaScreen extends StatelessWidget {
   ) => Align(
     alignment: posicion,
     child: Material(
-      color: AppColors.surface,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
@@ -72,11 +74,15 @@ class MapaScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(criatura.icono, size: 40, color: AppColors.primary),
+              Icon(
+                criatura.icono,
+                size: 40,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               Text(
                 criatura.nombre,
-                style: const TextStyle(
-                  color: AppColors.navy,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.bold,
                 ),
               ),

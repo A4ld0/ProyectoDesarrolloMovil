@@ -4,6 +4,7 @@ import 'encyclopedia_screen.dart'; //° pantalla 5 (explorar el mapa/enciclopedi
 import 'mis_creaciones_screen.dart'; //° pantalla de tu compañero
 import 'collection_screen.dart'; //° pantalla 10 (coleccion)
 import 'mapa_screen.dart';
+import 'ajustes_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   final int initialIndex;
@@ -38,6 +39,7 @@ class _MainNavigationState extends State<MainNavigation> {
       const EncyclopediaScreen(), //! index 1: enciclopedia completa
       const MisCreacionesScreen(), //! index 2: crear criaturas
       const CollectionScreen(), //! index 3: coleccion de capturados
+      const AjustesScreen(),
     ];
 
     return Scaffold(
@@ -45,6 +47,8 @@ class _MainNavigationState extends State<MainNavigation> {
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: _selectedIndex,
+        selectedFontSize: 12,
+        unselectedFontSize: 11,
         onTap: _selectPage,
         selectedItemColor: Theme.of(context)
             .colorScheme
@@ -65,6 +69,10 @@ class _MainNavigationState extends State<MainNavigation> {
           BottomNavigationBarItem(
             icon: Icon(Icons.shopping_bag),
             label: 'Colección',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings_outlined),
+            label: 'Ajustes',
           ),
         ],
       ),

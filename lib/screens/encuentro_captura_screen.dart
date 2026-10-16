@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../data/criaturas_demo.dart';
-import '../theme/app_colors.dart';
 import '../widgets/criatura_avatar.dart';
 
 class EncuentroCapturaScreen extends StatelessWidget {
@@ -9,6 +8,7 @@ class EncuentroCapturaScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     // Recibe la criatura que se tocó en el mapa.
     final criatura =
         ModalRoute.of(context)?.settings.arguments as CriaturaDemo? ??
@@ -16,9 +16,12 @@ class EncuentroCapturaScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Captura la criatura',
-          style: TextStyle(color: AppColors.navy, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: colors.secondary,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
       body: Center(
@@ -41,7 +44,7 @@ class EncuentroCapturaScreen extends StatelessWidget {
               Text(
                 'Tipo ${criatura.tipo}',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textSecondary),
+                style: TextStyle(color: colors.onSurfaceVariant),
               ),
               const SizedBox(height: 32),
               FilledButton.icon(

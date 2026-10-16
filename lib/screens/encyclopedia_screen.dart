@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../data/dummy_data.dart';
 import 'creature_detail_screen.dart';
 
@@ -19,7 +20,7 @@ class EncyclopediaScreen extends StatelessWidget {
         itemCount: dummyCreatures.length,
         itemBuilder: (ctx, index) {
           final creature = dummyCreatures[index];
-          
+
           return GestureDetector(
             onTap: () {
               //* si tocamos una criatura, abrimos su ficha detallada
@@ -31,18 +32,37 @@ class EncyclopediaScreen extends StatelessWidget {
             },
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.grey.shade200,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
               ),
               //? usamos colorfiltered para hacer grises a las que no estan capturadas
               child: ColorFiltered(
                 colorFilter: creature.isCaptured
-                    ? const ColorFilter.mode(Colors.transparent, BlendMode.multiply) //! sin filtro si ya se capturo
+                    ? const ColorFilter.mode(
+                        Colors.transparent,
+                        BlendMode.multiply,
+                      ) //! sin filtro si ya se capturo
                     : const ColorFilter.matrix(<double>[
-                        0.2126, 0.7152, 0.0722, 0, 0,
-                        0.2126, 0.7152, 0.0722, 0, 0,
-                        0.2126, 0.7152, 0.0722, 0, 0,
-                        0,      0,      0,      1, 0,
+                        0.2126,
+                        0.7152,
+                        0.0722,
+                        0,
+                        0,
+                        0.2126,
+                        0.7152,
+                        0.0722,
+                        0,
+                        0,
+                        0.2126,
+                        0.7152,
+                        0.0722,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        1,
+                        0,
                       ]), //! matriz que convierte a escala de grises
                 child: Image.network(creature.imageUrl),
               ),

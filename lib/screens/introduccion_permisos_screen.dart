@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
-
 class IntroduccionPermisosScreen extends StatefulWidget {
-  const IntroduccionPermisosScreen({super.key});
+  final bool desdeAjustes;
+
+  const IntroduccionPermisosScreen({super.key, this.desdeAjustes = false});
 
   @override
   State<IntroduccionPermisosScreen> createState() =>
@@ -23,8 +23,16 @@ class _IntroduccionPermisosScreenState
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
         child: FilledButton(
-          onPressed: () => Navigator.pushReplacementNamed(context, '/mapa'),
-          child: const Text('Comenzar a explorar'),
+          onPressed: () {
+            if (widget.desdeAjustes) {
+              Navigator.pop(context);
+            } else {
+              Navigator.pushReplacementNamed(context, '/mapa');
+            }
+          },
+          child: Text(
+            widget.desdeAjustes ? 'Volver a ajustes' : 'Comenzar a explorar',
+          ),
         ),
       ),
     ),
@@ -62,7 +70,7 @@ class _IntroduccionPermisosScreenState
     required VoidCallback onPressed,
   }) => Card(
     elevation: 0,
-    color: AppColors.surface,
+    color: Theme.of(context).colorScheme.surface,
     child: Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -70,7 +78,7 @@ class _IntroduccionPermisosScreenState
         children: [
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(icono, color: AppColors.primary),
+            leading: Icon(icono, color: Theme.of(context).colorScheme.primary),
             title: Text(titulo),
             subtitle: Text(descripcion),
           ),

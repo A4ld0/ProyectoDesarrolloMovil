@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../theme/app_colors.dart';
-
 class CompartirRecibirScreen extends StatelessWidget {
   const CompartirRecibirScreen({super.key});
   @override
@@ -30,90 +28,112 @@ class CompartirRecibirScreen extends StatelessWidget {
     );
   }
 
-  Widget _panel(BuildContext context, String name, bool receiving) => Center(
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 600),
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          Text(
-            receiving ? 'Recibe una criatura' : 'Comparte tu criatura',
-            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-          ),
+  Widget _panel(BuildContext context, String name, bool receiving) {
+    final colors = Theme.of(context).colorScheme;
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 600),
+        child: ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            Text(
+              receiving ? 'Recibe una criatura' : 'Comparte tu criatura',
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+            ),
 
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: AppColors.paleBlue,
-              borderRadius: BorderRadius.circular(28),
-            ),
-            child: Column(
-              children: [
-                Icon(
-                  receiving ? Icons.water_drop_rounded : Icons.cloud_rounded,
-                  size: 100,
-                  color: AppColors.primary,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  receiving
-                      ? 'Creada por Luna · Ejemplo'
-                      : 'Creada por ti · Ejemplo',
-                  style: const TextStyle(color: AppColors.textSecondary),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          if (!receiving)
-            const ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.info_outline, color: AppColors.primary),
-              title: Text('Busca y captura'),
-              subtitle: Text(
-                'Al recibirla, podra aparecer en tu mapa. Capturala para tenerla en tu coleccion.',
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: colors.primaryContainer,
+                borderRadius: BorderRadius.circular(28),
               ),
-            ),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            icon: Icon(receiving ? Icons.add : Icons.ios_share),
-            label: Text(receiving ? 'Probar recibir' : 'Probar compartir'),
-            onPressed: () => showDialog<void>(
-              context: context,
-              builder: (dialogContext) => AlertDialog(
-                title: Text(
-                  receiving ? 'Recibir (prueba)' : 'Compartir (prueba)',
-                ),
-                content: receiving
-                    ? null
-                    : Text(
-                        receiving
-                            ? '$name se agregaria a tu enciclopedia y podria aparecer en el mapa.\n\nPor ahora, no se guarda nada.'
-                            : 'La otra persona podria encontrar a $name en su mapa y capturarla.\n\nAun falta elegir como compartir.',
-                      ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(dialogContext),
-                    child: const Text('Entendido'),
+              child: Column(
+                children: [
+                  Icon(
+                    receiving ? Icons.water_drop_rounded : Icons.cloud_rounded,
+                    size: 100,
+                    color: colors.primary,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    receiving
+                        ? 'Creada por Luna · Ejemplo'
+                        : 'Creada por ti · Ejemplo',
+                    style: TextStyle(color: colors.onSurfaceVariant),
                   ),
                 ],
               ),
             ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Volver a mis creaciones'),
-          ),
-        ],
+            const SizedBox(height: 24),
+            if (!receiving)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.info_outline, color: colors.primary),
+                title: const Text('Busca y captura'),
+                subtitle: const Text(
+                  'Al recibirla, podra aparecer en tu mapa. Capturala para tenerla en tu coleccion.',
+                ),
+              ),
+            const SizedBox(height: 20),
+            Card(
+              elevation: 0,
+              color: colors.primaryContainer,
+              child: ListTile(
+                leading: Icon(Icons.nfc, color: colors.primary),
+                title: const Text('Intercambio NFC'),
+                subtitle: const Text(
+                  'Demostración: el intercambio entre dos Android '
+                  'está pendiente. No se activa NFC ni se transfieren datos.',
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              icon: const Icon(Icons.nfc),
+              label: Text(receiving ? 'Probar recibir' : 'Probar compartir'),
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (dialogContext) => AlertDialog(
+                  title: Text(
+                    receiving ? 'Recibir (prueba)' : 'Compartir (prueba)',
+                  ),
+                  content: Text(
+                    receiving
+                        ? 'Aquí se leerán por NFC los datos de una criatura '
+                              'compartida por otro Android. Después podrá '
+                              'aparecer en tu mapa para capturarla.\n\n'
+                              'Funcionalidad pendiente: por ahora, no se activa '
+                              'NFC, no se recibe ninguna criatura ni se guarda nada.'
+                        : 'Aquí se preparará a $name para compartirla con '
+                              'otro Android mediante NFC.\n\n'
+                              'Funcionalidad pendiente: la emisión desde el '
+                              'teléfono requiere una integración adicional. '
+                              'Por ahora, no se activa NFC ni se envían datos.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      child: const Text('Entendido'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Volver a mis creaciones'),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

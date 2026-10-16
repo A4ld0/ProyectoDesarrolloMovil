@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../data/criaturas_demo.dart';
-import '../theme/app_colors.dart';
 import '../widgets/criatura_avatar.dart';
 
 class ResultadoCapturaScreen extends StatelessWidget {
@@ -9,15 +8,19 @@ class ResultadoCapturaScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final criatura =
         ModalRoute.of(context)?.settings.arguments as CriaturaDemo? ??
         criaturasDemo[0];
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Captura exitosa',
-          style: TextStyle(color: AppColors.navy, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: colors.secondary,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
       body: Center(
@@ -39,7 +42,7 @@ class ResultadoCapturaScreen extends StatelessWidget {
               Text(
                 'Tipo ${criatura.tipo}',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textSecondary),
+                style: TextStyle(color: colors.onSurfaceVariant),
               ),
               const SizedBox(height: 24),
               FilledButton.icon(

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../data/criaturas_demo.dart';
-import '../theme/app_colors.dart';
 
 // El mismo icono fijo se usa en el mapa, el encuentro y el resultado.
 class CriaturaAvatar extends StatelessWidget {
@@ -14,18 +13,22 @@ class CriaturaAvatar extends StatelessWidget {
     height: 220,
     width: double.infinity,
     decoration: BoxDecoration(
-      color: AppColors.paleBlue,
+      color: Theme.of(context).colorScheme.primaryContainer,
       borderRadius: BorderRadius.circular(28),
-      border: Border.all(color: AppColors.border),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     child: Center(
       child: Container(
         padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
           shape: BoxShape.circle,
         ),
-        child: Icon(criatura.icono, size: 100, color: AppColors.primary),
+        child: Icon(
+          criatura.icono,
+          size: 100,
+          color: Theme.of(context).colorScheme.primary,
+        ),
       ),
     ),
   );
