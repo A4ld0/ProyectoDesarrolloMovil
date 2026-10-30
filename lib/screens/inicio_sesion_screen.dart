@@ -1,7 +1,26 @@
 import 'package:flutter/material.dart';
+// firebase_auth: lo usamos para iniciar sesión, registrar usuarios y entrar con Google
+import 'package:firebase_auth/firebase_auth.dart';
 
-class InicioSesionScreen extends StatelessWidget {
+// Pasa a Stateful para poder leer lo que se escribe en los TextField
+class InicioSesionScreen extends StatefulWidget {
   const InicioSesionScreen({super.key});
+
+  @override
+  State<InicioSesionScreen> createState() => _InicioSesionScreenState();
+}
+
+class _InicioSesionScreenState extends State<InicioSesionScreen> {
+  // Controladores para leer el correo y la contraseña
+  final _correoController = TextEditingController();
+  final _contrasenaController = TextEditingController();
+
+  @override
+  void dispose() {
+    _correoController.dispose();
+    _contrasenaController.dispose();
+    super.dispose();
+  }
 
   Future<void> _mostrarAcceso(BuildContext context, String metodo) async {
     FocusScope.of(context).unfocus();
@@ -25,6 +44,109 @@ class InicioSesionScreen extends StatelessWidget {
 
     if (continuar == true && context.mounted) {
       Navigator.pushReplacementNamed(context, '/permisos');
+    }
+  }
+
+  // Función para mostrar un error en una alerta simple
+  void _mostrarError(String mensaje) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('No se pudo entrar'),
+        content: Text(mensaje),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Función para iniciar sesión con correo y contraseña en Firebase
+  Future<void> _iniciarConCorreo() async {
+    FocusScope.of(context).unfocus();
+    final correo = _correoController.text.trim();
+    final contrasena = _contrasenaController.text;
+
+    if (correo.isEmpty || contrasena.isEmpty) {
+      _mostrarError('Escribe tu correo y tu contraseña.');
+      return;
+    }
+
+    try {
+      // Mandamos a llamar Firebase para iniciar sesión
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: correo,
+        password: contrasena,
+      );
+      if (mounted) Navigator.pushReplacementNamed(context, '/permisos');
+    } on FirebaseAuthException catch (e) {
+      // Firebase responde con un "code" que nos dice qué falló
+      if (e.code == 'invalid-credential' || e.code == 'user-not-found') {
+        // Puede que el usuario no exista: ofrecemos crear la cuenta
+        await _ofrecerRegistro(correo, contrasena);
+      } else {
+        _mostrarError(e.message ?? 'Ocurrió un error (${e.code}).');
+      }
+    }
+  }
+
+  // Función para registrar un usuario nuevo si el usuario acepta
+  Future<void> _ofrecerRegistro(String correo, String contrasena) async {
+    final crear = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('¿Crear cuenta?'),
+        content: Text(
+          'No encontramos una cuenta con esos datos.\n\n'
+          '¿Quieres crear una cuenta nueva con $correo?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Volver'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Crear cuenta'),
+          ),
+        ],
+      ),
+    );
+    if (crear != true) return;
+
+    try {
+      // Mandamos a llamar Firebase para crear el usuario (queda con sesión iniciada)
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: correo,
+        password: contrasena,
+      );
+      if (mounted) Navigator.pushReplacementNamed(context, '/permisos');
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'email-already-in-use') {
+        // El correo sí existe, entonces lo que falló fue la contraseña
+        _mostrarError('La contraseña es incorrecta.');
+      } else if (e.code == 'weak-password') {
+        _mostrarError('La contraseña debe tener al menos 6 caracteres.');
+      } else {
+        _mostrarError(e.message ?? 'Ocurrió un error (${e.code}).');
+      }
+    }
+  }
+
+  // Función para iniciar sesión con la cuenta de Google
+  Future<void> _iniciarConGoogle() async {
+    try {
+      // signInWithProvider abre la ventana de Google y regresa con la sesión
+      await FirebaseAuth.instance.signInWithProvider(GoogleAuthProvider());
+      if (mounted) Navigator.pushReplacementNamed(context, '/permisos');
+    } on FirebaseAuthException catch (e) {
+      // Si el usuario cierra la ventana no mostramos nada
+      if (e.code != 'canceled' && e.code != 'web-context-canceled') {
+        _mostrarError(e.message ?? 'Ocurrió un error (${e.code}).');
+      }
     }
   }
 
@@ -61,11 +183,12 @@ class InicioSesionScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 24),
-                const TextField(
+                TextField(
+                  controller: _correoController,
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
                   autocorrect: false,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Correo electrónico',
                     hintText: 'nombre@ejemplo.com',
                     prefixIcon: Icon(Icons.mail_outline),
@@ -73,11 +196,12 @@ class InicioSesionScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const TextField(
+                TextField(
+                  controller: _contrasenaController,
                   obscureText: true,
                   enableSuggestions: false,
                   autocorrect: false,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Contraseña',
                     prefixIcon: Icon(Icons.lock_outline),
                     border: OutlineInputBorder(),
@@ -85,8 +209,7 @@ class InicioSesionScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 FilledButton(
-                  onPressed: () =>
-                      _mostrarAcceso(context, 'correo y contraseña'),
+                  onPressed: _iniciarConCorreo,
                   child: const Text('Iniciar sesión'),
                 ),
                 const SizedBox(height: 20),
@@ -105,7 +228,7 @@ class InicioSesionScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
-                  onPressed: () => _mostrarAcceso(context, 'Google'),
+                  onPressed: _iniciarConGoogle,
                   icon: const Text(
                     'G',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),

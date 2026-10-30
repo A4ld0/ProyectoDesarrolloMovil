@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+// firebase_auth: lo usamos para cerrar la sesión del usuario
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../theme/app_theme_scope.dart';
 import 'introduccion_permisos_screen.dart';
@@ -55,11 +57,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('¿Cerrar sesión?'),
-        content: const Text(
-          'Volverás a la pantalla de inicio de sesión.\n\n'
-          'El cierre de sesión real está pendiente. '
-          'Por ahora, solo saldrás de la demostración.',
-        ),
+        content: const Text('Volverás a la pantalla de inicio de sesión.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -67,12 +65,16 @@ class _AjustesScreenState extends State<AjustesScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Salir de la demo'),
+            child: const Text('Cerrar sesión'),
           ),
         ],
       ),
     );
 
+    if (salir == true) {
+      // Mandamos a llamar Firebase para cerrar la sesión
+      await FirebaseAuth.instance.signOut();
+    }
     if (salir == true && mounted) {
       Navigator.pushNamedAndRemoveUntil(context, '/inicio', (route) => false);
     }

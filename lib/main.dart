@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+// firebase_core: paquete base para conectar la app con Firebase
+import 'package:firebase_core/firebase_core.dart';
+// firebase_auth: lo usamos para saber si ya hay sesión iniciada
+import 'package:firebase_auth/firebase_auth.dart';
+
+import 'firebase_options.dart';
 
 import 'theme/app_theme_scope.dart';
 import 'theme/app_themes.dart';
@@ -10,7 +16,14 @@ import 'screens/inicio_sesion_screen.dart';
 import 'screens/encuentro_captura_screen.dart';
 import 'screens/resultado_captura_screen.dart';
 
-void main() => runApp(const MyApp());
+// main es async porque esperamos a que Firebase arranque
+void main() async {
+  // Aseguramos que Flutter esté listo antes de llamar código nativo (Firebase)
+  WidgetsFlutterBinding.ensureInitialized();
+  // Mandamos a llamar Firebase con la configuración de firebase_options.dart
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  runApp(const MyApp());
+}
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -36,7 +49,11 @@ class _MyAppState extends State<MyApp> {
       theme: AppThemes.light,
       darkTheme: AppThemes.dark,
       themeMode: _modoOscuro ? ThemeMode.dark : ThemeMode.light,
-      home: const InicioSesionScreen(),
+      // Si Firebase ya recuerda una sesión vamos directo al mapa,
+      // si no, mostramos el inicio de sesión
+      home: FirebaseAuth.instance.currentUser == null
+          ? const InicioSesionScreen()
+          : const MainNavigation(),
       routes: {
         '/inicio': (_) => const InicioSesionScreen(),
         '/permisos': (_) => const IntroduccionPermisosScreen(),
