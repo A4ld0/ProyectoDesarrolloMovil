@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pokemonchafa/main.dart';
 
+import 'firebase_test_setup.dart';
+
 Future<void> mostrar(WidgetTester tester, Finder elemento) async {
   await tester.scrollUntilVisible(
     elemento,
@@ -13,11 +15,15 @@ Future<void> mostrar(WidgetTester tester, Finder elemento) async {
 
 Future<void> abrirPermisos(WidgetTester tester) async {
   await tester.pumpWidget(const MyApp());
+  await rellenarCorreo(tester);
   await mostrar(tester, find.text('Iniciar sesión'));
   await tester.tap(find.text('Iniciar sesión'));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('Continuar'));
-  await tester.pumpAndSettle();
+}
+
+Future<void> rellenarCorreo(WidgetTester tester) async {
+  await tester.enterText(find.byType(TextField).first, 'prueba@example.com');
+  await tester.enterText(find.byType(TextField).last, 'prueba123');
 }
 
 Future<void> abrirMapa(WidgetTester tester) async {
@@ -28,12 +34,15 @@ Future<void> abrirMapa(WidgetTester tester) async {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(prepararFirebaseDePruebas);
+
   for (final opcion in [
     ('Iniciar sesión', 'correo y contraseña'),
     ('Continuar con Google', 'Google'),
     ('Continuar con Apple', 'Apple'),
   ]) {
-    testWidgets('Acceso simulado con ${opcion.$2} en un teléfono pequeño', (
+    testWidgets('Acceso con ${opcion.$2} en un teléfono pequeño', (
       tester,
     ) async {
       tester.view.physicalSize = const Size(320, 640);
@@ -48,20 +57,22 @@ void main() {
         isTrue,
       );
 
+      if (opcion.$1 == 'Iniciar sesión') await rellenarCorreo(tester);
       await mostrar(tester, find.text(opcion.$1));
       await tester.tap(find.text(opcion.$1));
       await tester.pumpAndSettle();
-      expect(find.text('Funcionalidad pendiente'), findsOneWidget);
-      expect(find.textContaining(opcion.$2), findsWidgets);
-      await tester.tap(find.text('Volver'));
-      await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsNothing);
-      expect(find.widgetWithText(AppBar, 'Permisos'), findsNothing);
+      if (opcion.$2 == 'Apple') {
+        expect(find.text('Funcionalidad pendiente'), findsOneWidget);
+        await tester.tap(find.text('Volver'));
+        await tester.pumpAndSettle();
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(find.widgetWithText(AppBar, 'Permisos'), findsNothing);
 
-      await tester.tap(find.text(opcion.$1));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Continuar'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text(opcion.$1));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Continuar'));
+        await tester.pumpAndSettle();
+      }
       expect(find.widgetWithText(AppBar, 'Permisos'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
@@ -78,13 +89,13 @@ void main() {
     );
     expect(barra.items.map((item) => item.label).toList(), [
       'Mapa',
-      'Enciclopedia',
-      'Mis creaciones',
+      'Guía',
+      'Creaciones',
       'Colección',
       'Ajustes',
     ]);
 
-    await tester.tap(find.text('Mis creaciones'));
+    await tester.tap(find.text('Creaciones'));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(AppBar, 'Mis creaciones'), findsOneWidget);
     expect(find.byType(BottomNavigationBar), findsOneWidget);
@@ -172,7 +183,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Salir de la demo pide confirmación y vuelve al inicio', (
+  testWidgets('Cerrar sesión pide confirmación y vuelve al inicio', (
     tester,
   ) async {
     await abrirMapa(tester);
@@ -188,7 +199,7 @@ void main() {
     expect(find.widgetWithText(AppBar, 'Ajustes'), findsOneWidget);
     await tester.tap(find.text('Cerrar sesión'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Salir de la demo'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Cerrar sesión'));
     await tester.pumpAndSettle();
     expect(find.text('Iniciar sesión'), findsOneWidget);
     expect(
@@ -212,7 +223,7 @@ void main() {
 
   testWidgets('Navegacion de las tres vistas', (tester) async {
     await abrirMapa(tester);
-    await tester.tap(find.text('Mis creaciones'));
+    await tester.tap(find.text('Creaciones'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Crear una criatura'));
     await tester.pumpAndSettle();

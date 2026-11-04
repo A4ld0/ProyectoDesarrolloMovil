@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 // firebase_auth: lo usamos para saber si ya hay sesión iniciada
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 
 import 'firebase_options.dart';
 
-import 'theme/app_theme_scope.dart';
+import 'theme/tema_provider.dart';
 import 'theme/app_themes.dart';
 import 'screens/main_navigation.dart'; //° nuestro nuevo navegador inferior
 import 'screens/editor_dibujo_screen.dart';
@@ -25,45 +26,42 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatefulWidget {
+class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
-  State<MyApp> createState() => _MyAppState();
+  Widget build(BuildContext context) => ChangeNotifierProvider(
+    create: (_) => TemaProvider(),
+    child: const _Aplicacion(),
+  );
 }
 
-class _MyAppState extends State<MyApp> {
-  bool _modoOscuro = false;
-
-  void _cambiarModoOscuro(bool valor) {
-    setState(() => _modoOscuro = valor);
-  }
+class _Aplicacion extends StatelessWidget {
+  const _Aplicacion();
 
   @override
-  Widget build(BuildContext context) => AppThemeScope(
-    modoOscuro: _modoOscuro,
-    cambiarModoOscuro: _cambiarModoOscuro,
-    child: MaterialApp(
-      title: 'pokemonchafa',
-      debugShowCheckedModeBanner: false,
-      theme: AppThemes.light,
-      darkTheme: AppThemes.dark,
-      themeMode: _modoOscuro ? ThemeMode.dark : ThemeMode.light,
-      // Si Firebase ya recuerda una sesión vamos directo al mapa,
-      // si no, mostramos el inicio de sesión
-      home: FirebaseAuth.instance.currentUser == null
-          ? const InicioSesionScreen()
-          : const MainNavigation(),
-      routes: {
-        '/inicio': (_) => const InicioSesionScreen(),
-        '/permisos': (_) => const IntroduccionPermisosScreen(),
-        '/mapa': (_) => const MainNavigation(),
-        '/creaciones': (_) => const MainNavigation(initialIndex: 2),
-        '/encuentro': (_) => const EncuentroCapturaScreen(),
-        '/resultado': (_) => const ResultadoCapturaScreen(),
-        '/editor': (_) => const EditorDibujoScreen(),
-        '/intercambio': (_) => const CompartirRecibirScreen(),
-      },
-    ),
+  Widget build(BuildContext context) => MaterialApp(
+    title: 'pokemonchafa',
+    debugShowCheckedModeBanner: false,
+    theme: AppThemes.light,
+    darkTheme: AppThemes.dark,
+    themeMode: context.watch<TemaProvider>().modoOscuro
+        ? ThemeMode.dark
+        : ThemeMode.light,
+    // Si Firebase ya recuerda una sesión vamos directo al mapa,
+    // si no, mostramos el inicio de sesión
+    home: FirebaseAuth.instance.currentUser == null
+        ? const InicioSesionScreen()
+        : const MainNavigation(),
+    routes: {
+      '/inicio': (_) => const InicioSesionScreen(),
+      '/permisos': (_) => const IntroduccionPermisosScreen(),
+      '/mapa': (_) => const MainNavigation(),
+      '/creaciones': (_) => const MainNavigation(initialIndex: 2),
+      '/encuentro': (_) => const EncuentroCapturaScreen(),
+      '/resultado': (_) => const ResultadoCapturaScreen(),
+      '/editor': (_) => const EditorDibujoScreen(),
+      '/intercambio': (_) => const CompartirRecibirScreen(),
+    },
   );
 }

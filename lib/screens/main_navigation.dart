@@ -58,14 +58,8 @@ class _MainNavigationState extends State<MainNavigation> {
             icon: Icon(Icons.map_outlined),
             label: 'Mapa',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.location_on),
-            label: 'Enciclopedia',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.edit),
-            label: 'Mis creaciones',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.location_on), label: 'Guía'),
+          BottomNavigationBarItem(icon: Icon(Icons.edit), label: 'Creaciones'),
           BottomNavigationBarItem(
             icon: Icon(Icons.shopping_bag),
             label: 'Colección',

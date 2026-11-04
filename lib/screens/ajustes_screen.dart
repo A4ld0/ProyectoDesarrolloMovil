@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 // firebase_auth: lo usamos para cerrar la sesión del usuario
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 
-import '../theme/app_theme_scope.dart';
+import '../theme/tema_provider.dart';
 import 'introduccion_permisos_screen.dart';
 
 class AjustesScreen extends StatefulWidget {
@@ -82,7 +83,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tema = AppThemeScope.of(context);
+    final tema = context.watch<TemaProvider>();
     final colors = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Ajustes')),
