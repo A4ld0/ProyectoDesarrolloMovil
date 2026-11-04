@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "985282189962",
+    "project_id": "pokechafa",
+    "storage_bucket": "pokechafa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:985282189962:android:0b1573856cf07cb8352b73",
+        "android_client_info": {
+          "package_name": "com.example.pokemonchafa"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "985282189962-8qqctdpdljqki45dchp76ftdn5vqcld9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.pokemonchafa",
+            "certificate_hash": "008084ff59a84da33490164a46fdad199607ee0f"
+          }
+        },
+        {
+          "client_id": "985282189962-02cg58m4lh81ihe4lep8q7fqrhesuujf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJXX1imE8G6UOm-Af4vjR_CMo01lEMIUQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "985282189962-02cg58m4lh81ihe4lep8q7fqrhesuujf.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "985282189962-ld9uffcodtmsbli05k0j7oue4s59oe14.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.pokemonchafa"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
