@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 
+import '../data/foto_perfil_local.dart';
 import '../theme/tema_provider.dart';
+import '../widgets/foto_perfil_tile.dart';
 import 'introduccion_permisos_screen.dart';
 
 class AjustesScreen extends StatefulWidget {
@@ -85,6 +87,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
   Widget build(BuildContext context) {
     final tema = context.watch<TemaProvider>();
     final colors = Theme.of(context).colorScheme;
+    final usuario = FirebaseAuth.instance.currentUser;
     return Scaffold(
       appBar: AppBar(title: const Text('Ajustes')),
       body: Center(
@@ -93,6 +96,17 @@ class _AjustesScreenState extends State<AjustesScreen> {
           child: ListView(
             padding: const EdgeInsets.all(24),
             children: [
+              if (usuario != null && FotoPerfilLocal.disponible) ...[
+                Card(
+                  elevation: 0,
+                  color: colors.surface,
+                  child: FotoPerfilTile(
+                    key: ValueKey(usuario.uid),
+                    uid: usuario.uid,
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               Card(
                 elevation: 0,
                 color: colors.surface,

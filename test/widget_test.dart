@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pokemonchafa/main.dart';
+import 'package:pokemonchafa/screens/editor_dibujo_screen.dart';
 
 import 'firebase_test_setup.dart';
 
@@ -261,6 +262,62 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.widgetWithText(AppBar, 'Mis creaciones'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Dibuja con colores primarios, deshace y limpia los trazos', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(const MaterialApp(home: EditorDibujoScreen()));
+
+    final lienzo = find.byType(AspectRatio);
+    final sinTrazos = find.text('Dibuja aquí');
+    final deshacer = find.text('Deshacer');
+    final limpiar = find.text('Limpiar lienzo');
+    expect(sinTrazos, findsOneWidget);
+
+    await tester.drag(lienzo, const Offset(0, 64));
+    await tester.pump();
+    expect(sinTrazos, findsNothing);
+
+    await tester.tap(find.bySemanticsLabel('Azul'));
+    await tester.pump();
+    await tester.drag(lienzo, const Offset(64, 0));
+    await tester.pump();
+    final pintura = find.descendant(
+      of: lienzo,
+      matching: find.byType(CustomPaint),
+    );
+    expect(
+      pintura,
+      paints
+        ..path(color: Colors.red)
+        ..path(color: Colors.blue),
+    );
+
+    await tester.tap(find.bySemanticsLabel('Amarillo'));
+    await tester.pump();
+    await tester.tap(lienzo);
+    await tester.pump();
+    expect(
+      pintura,
+      paints
+        ..path(color: Colors.red)
+        ..path(color: Colors.blue)
+        ..circle(color: Colors.yellow),
+    );
+    await mostrar(tester, deshacer);
+    await tester.tap(deshacer);
+    await tester.pump();
+    expect(sinTrazos, findsNothing);
+
+    await tester.tap(limpiar);
+    await tester.pump();
+    expect(sinTrazos, findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

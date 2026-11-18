@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import 'firebase_options.dart';
 
+import 'data/foto_perfil_local.dart';
 import 'theme/tema_provider.dart';
 import 'theme/app_themes.dart';
 import 'screens/main_navigation.dart'; //° nuestro nuevo navegador inferior
@@ -23,6 +24,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Mandamos a llamar Firebase con la configuración de firebase_options.dart
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await FotoPerfilLocal.recuperarSeleccionPendiente();
   runApp(const MyApp());
 }
 
