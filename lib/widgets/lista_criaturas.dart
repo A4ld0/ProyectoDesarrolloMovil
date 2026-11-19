@@ -1,12 +1,13 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter/material.dart'; //° widgets de material
+import 'package:provider/provider.dart'; //° gestion de estado
 
-import '../data/datos_app.dart';
-import '../models/criatura.dart';
-import '../screens/creature_detail_screen.dart';
-import 'dibujo_criatura.dart';
-import 'recarga_firebase.dart';
+import '../data/datos_app.dart'; //° provider con firestore
+import '../models/criatura.dart'; //° modelo de criatura
+import '../screens/creature_detail_screen.dart'; //° ficha de la criatura
+import 'dibujo_criatura.dart'; //° dibujo de la criatura
+import 'recarga_firebase.dart'; //° swipe down para recargar
 
+//* cuadricula que comparten la enciclopedia y la coleccion
 class ListaCriaturas extends StatelessWidget {
   const ListaCriaturas({
     required this.criaturas,
@@ -21,6 +22,7 @@ class ListaCriaturas extends StatelessWidget {
     final datos = context.watch<DatosApp>();
     final colores = Theme.of(context).colorScheme;
     return RecargaFirebase(
+      //? aunque este vacia se usa un ListView para que el swipe down funcione
       child: criaturas.isEmpty
           ? ListView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -43,6 +45,7 @@ class ListaCriaturas extends StatelessWidget {
                   color: colores.surfaceContainerHighest,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
+                    //* abre la ficha de la criatura tocada
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(

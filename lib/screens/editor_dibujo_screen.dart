@@ -1,10 +1,11 @@
-import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter/gestures.dart'; //° DragStartBehavior para el lienzo
+import 'package:flutter/material.dart'; //° widgets de material
+import 'package:provider/provider.dart'; //° gestion de estado
+import 'package:shared_preferences/shared_preferences.dart'; //° guarda los colores propios en el telefono
 
-import '../data/datos_app.dart';
-import '../models/criatura.dart';
-import '../widgets/dibujo_criatura.dart';
+import '../data/datos_app.dart'; //° provider con firestore
+import '../models/criatura.dart'; //° modelo de criatura y trazo
+import '../widgets/dibujo_criatura.dart'; //° pintor del dibujo
 
 class EditorDibujoScreen extends StatefulWidget {
   const EditorDibujoScreen({super.key});
@@ -24,6 +25,178 @@ class _EditorDibujoScreenState extends State<EditorDibujoScreen> {
   bool _guardando = false;
   Color _colorSeleccionado = Colors.red;
   int _revision = 0;
+
+  //_ colores base que siempre aparecen
+  final List<Color> _coloresBase = [Colors.red, Colors.yellow, Colors.blue];
+  final List<String> _nombresBase = ['Rojo', 'Amarillo', 'Azul'];
+  //_ colores que el usuario crea con el boton +
+  final List<Color> _coloresPropios = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarColores();
+  }
+
+  //* lee los colores propios guardados en el telefono
+  Future<void> _cargarColores() async {
+    final prefs = SharedPreferencesAsync();
+    final guardados = await prefs.getStringList('coloresPropios') ?? [];
+    if (!mounted) return;
+    setState(() {
+      for (final valor in guardados) {
+        _coloresPropios.add(Color(int.parse(valor)));
+      }
+    });
+  }
+
+  //* guarda la lista de colores propios como texto (el numero argb)
+  Future<void> _guardarColores() async {
+    final prefs = SharedPreferencesAsync();
+    final valores = <String>[];
+    for (final color in _coloresPropios) {
+      valores.add(color.toARGB32().toString());
+    }
+    await prefs.setStringList('coloresPropios', valores);
+  }
+
+  //* abre un dialogo con 3 sliders (rojo, verde, azul) para crear un color
+  Future<void> _crearColor() async {
+    double rojo = 120;
+    double verde = 60;
+    double azul = 200;
+
+    final nuevo = await showDialog<Color>(
+      context: context,
+      builder: (context) {
+        //? StatefulBuilder deja usar setState solo dentro del dialogo
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final vistaPrevia = Color.fromARGB(
+              255,
+              rojo.round(),
+              verde.round(),
+              azul.round(),
+            );
+            return AlertDialog(
+              title: const Text('Crea tu color'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: vistaPrevia,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _slider('Rojo', rojo, Colors.red, (valor) {
+                    setDialogState(() => rojo = valor);
+                  }),
+                  _slider('Verde', verde, Colors.green, (valor) {
+                    setDialogState(() => verde = valor);
+                  }),
+                  _slider('Azul', azul, Colors.blue, (valor) {
+                    setDialogState(() => azul = valor);
+                  }),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, vistaPrevia),
+                  child: const Text('Agregar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (nuevo == null) return;
+    //! si el color ya existe solo se selecciona, no se repite
+    final yaExiste =
+        _coloresBase.contains(nuevo) || _coloresPropios.contains(nuevo);
+    setState(() {
+      if (!yaExiste) _coloresPropios.add(nuevo);
+      _colorSeleccionado = nuevo;
+    });
+    if (!yaExiste) await _guardarColores();
+  }
+
+  //* renglon con el nombre del canal y su slider de 0 a 255
+  Widget _slider(
+    String nombre,
+    double valor,
+    Color color,
+    ValueChanged<double> alCambiar,
+  ) {
+    return Row(
+      children: [
+        SizedBox(width: 50, child: Text(nombre)),
+        Expanded(
+          child: Slider(
+            value: valor,
+            min: 0,
+            max: 255,
+            activeColor: color,
+            onChanged: alCambiar,
+          ),
+        ),
+        SizedBox(width: 32, child: Text('${valor.round()}')),
+      ],
+    );
+  }
+
+  //* borra un color propio al dejarlo presionado
+  Future<void> _borrarColor(Color color) async {
+    setState(() {
+      _coloresPropios.remove(color);
+      if (_colorSeleccionado == color) _colorSeleccionado = Colors.red;
+    });
+    await _guardarColores();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Color eliminado de tu paleta')),
+      );
+    }
+  }
+
+  //* circulo de color que se puede tocar para elegirlo
+  Widget _botonColor(Color color, String nombre, {VoidCallback? alBorrar}) {
+    final colors = Theme.of(context).colorScheme;
+    final seleccionado = _colorSeleccionado == color;
+    return Semantics(
+      label: nombre,
+      button: true,
+      selected: seleccionado,
+      child: InkResponse(
+        onTap: () => setState(() => _colorSeleccionado = color),
+        onLongPress: alBorrar,
+        radius: 24,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color,
+              border: Border.all(
+                color: seleccionado ? colors.onSurface : colors.outlineVariant,
+                width: seleccionado ? 3 : 1,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   void didChangeDependencies() {
@@ -50,6 +223,8 @@ class _EditorDibujoScreenState extends State<EditorDibujoScreen> {
     super.dispose();
   }
 
+  //* crea (add) o actualiza (update) la criatura en firestore
+  //_ si llego una criatura por argumentos es modo editar, si no es crear
   Future<void> _guardar() async {
     if (_guardando) return;
     if (_nombre.text.trim().isEmpty ||
@@ -95,6 +270,9 @@ class _EditorDibujoScreenState extends State<EditorDibujoScreen> {
     }
   }
 
+  //* empieza un trazo nuevo con el color elegido
+  //? el punto se divide entre el lado para guardarlo de 0 a 1 y que el dibujo
+  //? se vea igual en cualquier tamano de pantalla
   void _iniciarTrazo(Offset punto, double lado) {
     if (_guardando || _trazos.length >= 300) return;
     setState(() {
@@ -103,12 +281,16 @@ class _EditorDibujoScreenState extends State<EditorDibujoScreen> {
     });
   }
 
+  //* agrega puntos al ultimo trazo mientras se arrastra el dedo
+  //! fold suma todos los puntos de todos los trazos; se limita a 5000
+  //! para que el documento de firestore no pase su tamano maximo
   void _continuarTrazo(Offset punto, double lado) {
     if (_guardando ||
         _trazos.isEmpty ||
         _trazos.fold<int>(0, (total, trazo) => total + trazo.puntos.length) >=
-            5000)
+            5000) {
       return;
+    }
     final normalizado = Offset(
       (punto.dx / lado).clamp(0, 1),
       (punto.dy / lado).clamp(0, 1),
@@ -168,43 +350,31 @@ class _EditorDibujoScreenState extends State<EditorDibujoScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              //? wrap para que los colores bajen de linea cuando son muchos
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  for (final opcion in const [
-                    (nombre: 'Rojo', color: Colors.red),
-                    (nombre: 'Amarillo', color: Colors.yellow),
-                    (nombre: 'Azul', color: Colors.blue),
-                  ])
-                    Semantics(
-                      label: opcion.nombre,
-                      button: true,
-                      selected: _colorSeleccionado == opcion.color,
-                      child: InkResponse(
-                        onTap: () => setState(() {
-                          _colorSeleccionado = opcion.color;
-                        }),
-                        radius: 24,
-                        child: Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: opcion.color,
-                              border: Border.all(
-                                color: _colorSeleccionado == opcion.color
-                                    ? colors.onSurface
-                                    : Colors.transparent,
-                                width: 3,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
+                  for (int i = 0; i < _coloresBase.length; i++)
+                    _botonColor(_coloresBase[i], _nombresBase[i]),
+                  for (final color in _coloresPropios)
+                    _botonColor(
+                      color,
+                      'Color propio',
+                      alBorrar: () => _borrarColor(color),
                     ),
+                  //* boton para crear un color nuevo
+                  IconButton(
+                    tooltip: 'Crear color',
+                    onPressed: _guardando ? null : _crearColor,
+                    icon: const Icon(Icons.add_circle_outline),
+                  ),
                 ],
+              ),
+              Text(
+                'Toca + para crear tu color. Mantén presionado un color propio para quitarlo.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
               ),
               const SizedBox(height: 12),
               ClipRRect(

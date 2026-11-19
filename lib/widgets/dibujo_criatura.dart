@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; //° CustomPainter y widgets
 
-import '../models/criatura.dart';
+import '../models/criatura.dart'; //° modelo de criatura y trazo
 
+//* muestra el dibujo de la criatura o su icono si no tiene dibujo
 class DibujoCriatura extends StatelessWidget {
   const DibujoCriatura({required this.criatura, this.tamano = 120, super.key});
 
@@ -17,6 +18,8 @@ class DibujoCriatura extends StatelessWidget {
   );
 }
 
+//! pinta los trazos guardados; los puntos vienen de 0 a 1 y se
+//! multiplican por el tamano para escalar el dibujo
 class PintorDibujo extends CustomPainter {
   const PintorDibujo(this.trazos, {this.revision = 0});
 
@@ -51,6 +54,7 @@ class PintorDibujo extends CustomPainter {
     }
   }
 
+  //? revision cambia en cada trazo nuevo para forzar el repintado
   @override
   bool shouldRepaint(covariant PintorDibujo anterior) =>
       revision != anterior.revision || trazos != anterior.trazos;
