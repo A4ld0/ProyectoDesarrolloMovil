@@ -4,9 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
-import 'criaturas_demo.dart';
+import '../models/criatura.dart';
 
-typedef AparicionCercana = ({CriaturaDemo criatura, LatLng punto});
+typedef AparicionCercana = ({Criatura criatura, LatLng punto});
 
 enum ProblemaUbicacion {
   gpsApagado,
@@ -21,7 +21,6 @@ class UbicacionMapa extends ChangeNotifier {
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS);
 
-  static const _distancia = Distance(calculator: Haversine());
   static const _ajustes = LocationSettings(
     accuracy: LocationAccuracy.high,
     distanceFilter: 5,
@@ -40,30 +39,11 @@ class UbicacionMapa extends ChangeNotifier {
   bool _revisarAlVolver = false;
   bool _cerrado = false;
   LatLng? _posicion;
-  List<AparicionCercana> _apariciones = const [];
   ProblemaUbicacion? _problema;
 
   LatLng? get posicion => _posicion;
-  List<AparicionCercana> get apariciones => _apariciones;
   ProblemaUbicacion? get problema => _problema;
   bool get esperando => _activando || _esperaInicial != null;
-
-  List<({CriaturaDemo criatura, double? metros})> get cercanas {
-    final posicion = _posicion;
-    if (posicion == null) {
-      return [
-        for (final criatura in criaturasDemo)
-          (criatura: criatura, metros: null),
-      ];
-    }
-    return <({CriaturaDemo criatura, double metros})>[
-      for (final aparicion in _apariciones)
-        (
-          criatura: aparicion.criatura,
-          metros: _distancia(posicion, aparicion.punto),
-        ),
-    ]..sort((a, b) => a.metros.compareTo(b.metros));
-  }
 
   Future<void> activar({bool solicitarPermiso = true}) async {
     if (_cerrado || !_visible || _activando || _seguimiento != null) return;
@@ -135,25 +115,7 @@ class UbicacionMapa extends ChangeNotifier {
     _esperaInicial = null;
     final punto = LatLng(lectura.latitude, lectura.longitude);
     _posicion = punto;
-    if (_apariciones.isEmpty) {
-      _apariciones = List.unmodifiable([
-        for (final (indice, metros, rumbo) in const [
-          (0, 80.0, -45.0),
-          (1, 115.0, 70.0),
-          (2, 145.0, -165.0),
-        ])
-          (
-            criatura: criaturasDemo[indice],
-            punto: _desplazar(punto, metros, rumbo),
-          ),
-      ]);
-    }
     notifyListeners();
-  }
-
-  LatLng _desplazar(LatLng origen, double metros, double rumbo) {
-    final punto = _distancia.offset(origen, metros, rumbo);
-    return LatLng(punto.latitude, (punto.longitude + 180) % 360 - 180);
   }
 
   void _errorDeLectura(Object error) => _fallar(switch (error) {

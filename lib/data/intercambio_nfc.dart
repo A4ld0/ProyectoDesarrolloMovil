@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
 
-import 'criaturas_demo.dart';
+import '../models/criatura.dart';
 
 class ErrorIntercambioNfc implements Exception {
   const ErrorIntercambioNfc(this.mensaje);
@@ -31,10 +31,10 @@ class ProtocoloCriaturaNfc {
   static const _confirmar = [0x80, 0x20, 0x00, 0x00, 0x00];
   static const _version = 1;
 
-  static Uint8List codificar(CriaturaDemo criatura) =>
+  static Uint8List codificar(Criatura criatura) =>
       Uint8List.fromList([_version, ...criatura.id.codeUnits]);
 
-  static CriaturaDemo? _decodificar(Uint8List respuesta) {
+  static String? _decodificar(Uint8List respuesta) {
     if (respuesta.length < 4 || respuesta.length > 34) return null;
     final fin = respuesta.length - 2;
     if (respuesta[fin] != 0x90 ||
@@ -42,16 +42,20 @@ class ProtocoloCriaturaNfc {
         respuesta[0] != _version) {
       return null;
     }
-    return criaturaDemoPorId(String.fromCharCodes(respuesta, 1, fin));
+    final id = String.fromCharCodes(respuesta, 1, fin);
+    return RegExp(r'^[a-zA-Z0-9_-]{1,31}$').hasMatch(id) ? id : null;
   }
 
-  static Future<CriaturaDemo?> leer({
+  static Future<Criatura?> leer({
     required Future<Uint8List> Function(Uint8List) transceive,
-    required Future<void> Function(CriaturaDemo) guardar,
+    required Future<void> Function(Criatura) guardar,
+    required Future<Criatura?> Function(String) buscar,
     required bool Function() activo,
   }) async {
     final respuesta = await _transmitir(transceive, _seleccionar);
-    final criatura = respuesta == null ? null : _decodificar(respuesta);
+    final id = respuesta == null ? null : _decodificar(respuesta);
+    if (id == null || !activo()) return null;
+    final criatura = await buscar(id);
     if (criatura == null || !activo()) return null;
 
     await guardar(criatura);
@@ -81,7 +85,7 @@ class IntercambioNfc {
   static const _tiempoDelAdaptador = Duration(seconds: 5);
   static const mensajeSinNfc = 'El intercambio requiere un Android con NFC.';
 
-  Completer<CriaturaDemo?>? _recepcion;
+  Completer<Criatura?>? _recepcion;
   bool _envioCancelado = false;
   bool _enviandoPorCanal = false;
 
@@ -111,7 +115,7 @@ class IntercambioNfc {
     }
   }
 
-  Future<bool> compartir(CriaturaDemo criatura) async {
+  Future<bool> compartir(Criatura criatura) async {
     _envioCancelado = false;
     await _comprobarNfc();
     if (_envioCancelado) return false;
@@ -140,10 +144,11 @@ class IntercambioNfc {
     }
   }
 
-  Future<CriaturaDemo?> recibir(
-    Future<void> Function(CriaturaDemo) guardar,
+  Future<Criatura?> recibir(
+    Future<void> Function(Criatura) guardar,
+    Future<Criatura?> Function(String) buscar,
   ) async {
-    final recepcion = Completer<CriaturaDemo?>();
+    final recepcion = Completer<Criatura?>();
     _recepcion = recepcion;
     var activarLector = false;
     try {
@@ -168,6 +173,7 @@ class IntercambioNfc {
             final criatura = await ProtocoloCriaturaNfc.leer(
               transceive: isoDep.transceive,
               guardar: guardar,
+              buscar: buscar,
               activo: () => !recepcion.isCompleted,
             );
             if (criatura != null && !recepcion.isCompleted) {
@@ -189,7 +195,7 @@ class IntercambioNfc {
         inicio,
         recepcion.future.timeout(_tiempoDeRecepcion),
       ], eagerError: true);
-      return resultados[1] as CriaturaDemo?;
+      return resultados[1] as Criatura?;
     } on TimeoutException {
       throw const ErrorIntercambioNfc(
         'No se detectó otro teléfono compartiendo. Inténtalo de nuevo.',

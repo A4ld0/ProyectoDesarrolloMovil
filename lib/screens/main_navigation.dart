@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:latlong2/latlong.dart';
 
-import '../data/criaturas_demo.dart';
+import '../models/criatura.dart';
+import '../data/datos_app.dart';
 import '../data/ubicacion_mapa.dart';
 import 'mapa_screen.dart';
 
@@ -15,7 +18,7 @@ class _MainNavigationState extends State<MainNavigation> {
   final _ubicacion = UbicacionMapa();
   final _mapaGeografico = GlobalKey<MapaGeograficoState>();
   late final AppLifecycleListener _cicloDeVida;
-  CriaturaDemo? _criaturaDestacada;
+  Criatura? _criaturaDestacada;
 
   @override
   void initState() {
@@ -45,25 +48,43 @@ class _MainNavigationState extends State<MainNavigation> {
     constraints: const BoxConstraints(maxWidth: 600),
     builder: (context) => SafeArea(
       top: false,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Text(
-                titulo,
-                style: Theme.of(context).textTheme.titleLarge,
+      child: RefreshIndicator(
+        onRefresh: _refrescar,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(
+                  titulo,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
               ),
-            ),
-            ...opciones(context),
-          ],
+              ...opciones(context),
+            ],
+          ),
         ),
       ),
     ),
   );
+
+  Future<void> _refrescar() async {
+    try {
+      await context.read<DatosApp>().refrescar();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo actualizar. Revisa tu conexión.'),
+          ),
+        );
+      }
+    }
+  }
 
   Future<void> _abrirMenu() async {
     final ruta = await _elegirEnPanel<String>(
@@ -73,6 +94,7 @@ class _MainNavigationState extends State<MainNavigation> {
           ('Guía', Icons.menu_book_outlined, '/guia'),
           ('Colección', Icons.inventory_2_outlined, '/coleccion'),
           ('Creaciones', Icons.brush_outlined, '/creaciones'),
+          ('Amigos', Icons.people_outline, '/amigos'),
         ])
           ListTile(
             leading: Icon(icono),
@@ -86,15 +108,17 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 
   Future<void> _abrirCercanas() async {
-    final criatura = await _elegirEnPanel<CriaturaDemo>(
+    final datos = context.read<DatosApp>();
+    final criatura = await _elegirEnPanel<Criatura>(
       'Cerca de ti',
       (context) => [
         ListenableBuilder(
-          listenable: _ubicacion,
+          listenable: Listenable.merge([_ubicacion, datos]),
           builder: (context, _) => Column(
             children: [
-              for (final (criatura: criatura, metros: metros)
-                  in _ubicacion.cercanas)
+              for (final (criatura: criatura, metros: metros) in _cercanas(
+                datos,
+              ))
                 ListTile(
                   leading: Icon(criatura.icono),
                   title: Text(criatura.nombre),
@@ -103,8 +127,8 @@ class _MainNavigationState extends State<MainNavigation> {
                         ? 'Tipo ${criatura.tipo}'
                         : 'Tipo ${criatura.tipo} · ≈ ${_mostrarDistancia(metros)}',
                   ),
-                  selected: criatura == _criaturaDestacada,
-                  trailing: criatura == _criaturaDestacada
+                  selected: criatura.id == _criaturaDestacada?.id,
+                  trailing: criatura.id == _criaturaDestacada?.id
                       ? const Icon(Icons.check)
                       : null,
                   onTap: () => Navigator.pop(context, criatura),
@@ -116,8 +140,8 @@ class _MainNavigationState extends State<MainNavigation> {
     );
     if (criatura != null && mounted) {
       setState(() => _criaturaDestacada = criatura);
-      for (final aparicion in _ubicacion.apariciones) {
-        if (aparicion.criatura == criatura) {
+      for (final aparicion in _apariciones(datos)) {
+        if (aparicion.criatura.id == criatura.id) {
           _mapaGeografico.currentState?.centrarEn(aparicion.punto);
           break;
         }
@@ -128,6 +152,32 @@ class _MainNavigationState extends State<MainNavigation> {
   String _mostrarDistancia(double metros) => metros < 1000
       ? '${metros.round()} m'
       : '${(metros / 1000).toStringAsFixed(1).replaceAll('.', ',')} km';
+
+  List<AparicionCercana> _apariciones(DatosApp datos) => [
+    for (final criatura in datos.catalogo)
+      if (datos.puntos[criatura.id] != null &&
+          !datos.estaCapturada(criatura.id))
+        (criatura: criatura, punto: datos.puntos[criatura.id]!),
+  ];
+
+  List<({Criatura criatura, double? metros})> _cercanas(DatosApp datos) {
+    final posicion = _ubicacion.posicion;
+    final cercanas = [
+      for (final criatura in datos.catalogo)
+        if (!datos.estaCapturada(criatura.id))
+          (
+            criatura: criatura,
+            metros: posicion != null && datos.puntos[criatura.id] != null
+                ? const Distance()(posicion, datos.puntos[criatura.id]!)
+                : null,
+          ),
+    ];
+    cercanas.sort(
+      (a, b) =>
+          (a.metros ?? double.infinity).compareTo(b.metros ?? double.infinity),
+    );
+    return cercanas;
+  }
 
   Future<void> _abrirAjustesDeUbicacion() async {
     if (!await _ubicacion.abrirAjustes() && mounted) {
@@ -143,7 +193,28 @@ class _MainNavigationState extends State<MainNavigation> {
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: _ubicacion,
     builder: (context, _) {
+      final datos = context.watch<DatosApp>();
       final posicion = _ubicacion.posicion;
+      if (posicion != null &&
+          datos.catalogo.any(
+            (criatura) => !datos.puntos.containsKey(criatura.id),
+          )) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!mounted) return;
+          try {
+            await datos.colocarCerca(posicion);
+          } catch (_) {
+            if (context.mounted)
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'No se pudieron cargar las apariciones del mapa.',
+                  ),
+                ),
+              );
+          }
+        });
+      }
       final problema = _ubicacion.problema;
       return Scaffold(
         appBar: AppBar(
@@ -189,7 +260,7 @@ class _MainNavigationState extends State<MainNavigation> {
                     : MapaGeografico(
                         key: _mapaGeografico,
                         posicion: posicion,
-                        apariciones: _ubicacion.apariciones,
+                        apariciones: _apariciones(datos),
                         criaturaDestacada: _criaturaDestacada,
                       ),
                 controles: _controles(),
@@ -259,7 +330,7 @@ class _AvisoUbicacion extends StatelessWidget {
     return ListTile(
       leading: const Icon(Icons.location_off_outlined),
       title: Text(mensaje),
-      subtitle: const Text('Puedes seguir explorando en la demostración.'),
+      subtitle: const Text('Puedes consultar las criaturas desde el menú.'),
       trailing: mostrarAjustes
           ? TextButton(onPressed: abrirAjustes, child: const Text('Ajustes'))
           : null,

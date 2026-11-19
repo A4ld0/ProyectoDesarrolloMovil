@@ -6,6 +6,9 @@ import 'package:geolocator_platform_interface/geolocator_platform_interface.dart
 import 'package:latlong2/latlong.dart';
 import 'package:pokemonchafa/data/ubicacion_mapa.dart';
 import 'package:pokemonchafa/screens/main_navigation.dart';
+import 'package:provider/provider.dart';
+
+import 'datos_prueba.dart';
 
 class _GpsDePruebas extends GeolocatorPlatform {
   final posiciones = StreamController<Position>.broadcast();
@@ -66,9 +69,7 @@ void main() {
     await gps.estados.close();
   });
 
-  testWidgets('Al caminar cambian las distancias con las criaturas fijas', (
-    tester,
-  ) async {
+  testWidgets('Al caminar se actualiza la posición GPS', (tester) async {
     final mapa = UbicacionMapa();
     addTearDown(mapa.dispose);
     await mapa.activar();
@@ -77,16 +78,10 @@ void main() {
     await tester.pump();
 
     expect(mapa.posicion, inicio);
-    final ubicacionesOriginales = mapa.apariciones;
-    expect(ubicacionesOriginales, hasLength(3));
-    final cercanas = mapa.cercanas;
-    expect(cercanas.map((ejemplar) => ejemplar.metros), [80, 115, 145]);
-
-    gps.moverA(ubicacionesOriginales.last.punto);
+    const destino = LatLng(19.4330, -99.1332);
+    gps.moverA(destino);
     await tester.pump();
-    expect(mapa.apariciones, same(ubicacionesOriginales));
-    expect(mapa.cercanas.first.criatura.nombre, 'Estelin');
-    expect(mapa.cercanas.first.metros, 0);
+    expect(mapa.posicion, destino);
   });
 
   testWidgets('El seguimiento se pausa y al volver conserva las coordenadas', (
@@ -98,7 +93,6 @@ void main() {
     const inicio = LatLng(19.4326, -99.1332);
     gps.moverA(inicio);
     await tester.pump();
-    final apariciones = mapa.apariciones;
 
     mapa.pausar();
     expect(gps.posiciones.hasListener, isFalse);
@@ -109,7 +103,7 @@ void main() {
     expect(gps.solicitudes, 0);
     gps.moverA(const LatLng(19.4330, -99.1332));
     await tester.pump();
-    expect(mapa.apariciones, same(apariciones));
+    expect(mapa.posicion, const LatLng(19.4330, -99.1332));
 
     gps.estados.add(ServiceStatus.disabled);
     await tester.pump();
@@ -118,11 +112,17 @@ void main() {
     expect(gps.posiciones.hasListener, isFalse);
   });
 
-  testWidgets('El mapa de demostración funciona si se deniega el permiso', (
+  testWidgets('El catálogo sigue disponible si se deniega el permiso', (
     tester,
   ) async {
     gps.permiso = LocationPermission.denied;
-    await tester.pumpWidget(const MaterialApp(home: MainNavigation()));
+    final datos = await datosDePrueba();
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => datos,
+        child: const MaterialApp(home: MainNavigation()),
+      ),
+    );
     expect(gps.solicitudes, 0);
 
     await tester.tap(find.text('Usar mi ubicación'));

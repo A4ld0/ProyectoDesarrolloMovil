@@ -1,5 +1,10 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../data/datos_app.dart';
+import '../models/criatura.dart';
+import '../widgets/dibujo_criatura.dart';
 
 class EditorDibujoScreen extends StatefulWidget {
   const EditorDibujoScreen({super.key});
@@ -9,21 +14,107 @@ class EditorDibujoScreen extends StatefulWidget {
 }
 
 class _EditorDibujoScreenState extends State<EditorDibujoScreen> {
-  final _trazos = <_Trazo>[];
+  final _trazos = <TrazoDibujo>[];
+  final _nombre = TextEditingController();
+  final _tipo = TextEditingController();
+  final _descripcion = TextEditingController();
+  Criatura? _original;
+  String? _idNuevo;
+  bool _inicializado = false;
+  bool _guardando = false;
   Color _colorSeleccionado = Colors.red;
   int _revision = 0;
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_inicializado) return;
+    _inicializado = true;
+    final argumento = ModalRoute.of(context)?.settings.arguments;
+    if (argumento is Criatura) {
+      _original = argumento;
+      _nombre.text = argumento.nombre;
+      _tipo.text = argumento.tipo;
+      _descripcion.text = argumento.descripcion;
+      _trazos.addAll(
+        argumento.dibujo.map((trazo) => TrazoDibujo(trazo.color, trazo.puntos)),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _nombre.dispose();
+    _tipo.dispose();
+    _descripcion.dispose();
+    super.dispose();
+  }
+
+  Future<void> _guardar() async {
+    if (_guardando) return;
+    if (_nombre.text.trim().isEmpty ||
+        _tipo.text.trim().isEmpty ||
+        _trazos.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Escribe el nombre, el tipo y dibuja tu criatura.'),
+        ),
+      );
+      return;
+    }
+    setState(() => _guardando = true);
+    final datos = context.read<DatosApp>();
+    _idNuevo ??= datos.criaturas.doc().id;
+    try {
+      await datos.guardar(
+        Criatura(
+          id: _original?.id ?? _idNuevo!,
+          nombre: _nombre.text.trim(),
+          tipo: _tipo.text.trim(),
+          descripcion: _descripcion.text.trim(),
+          creadorId: datos.usuario!.uid,
+          dibujo: _trazos
+              .map((trazo) => TrazoDibujo(trazo.color, trazo.puntos))
+              .toList(),
+          version: _original?.version ?? 1,
+        ),
+        nueva: _original == null,
+      );
+      if (mounted) Navigator.pop(context);
+    } catch (error) {
+      if (mounted) {
+        setState(() => _guardando = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is StateError ? error.message.toString() : 'No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
   void _iniciarTrazo(Offset punto, double lado) {
+    if (_guardando || _trazos.length >= 300) return;
     setState(() {
-      _trazos.add(_Trazo(_colorSeleccionado, punto / lado));
+      _trazos.add(TrazoDibujo(_colorSeleccionado, [punto / lado]));
       _revision++;
     });
   }
 
   void _continuarTrazo(Offset punto, double lado) {
-    if (_trazos.isEmpty) return;
+    if (_guardando ||
+        _trazos.isEmpty ||
+        _trazos.fold<int>(0, (total, trazo) => total + trazo.puntos.length) >=
+            5000)
+      return;
+    final normalizado = Offset(
+      (punto.dx / lado).clamp(0, 1),
+      (punto.dy / lado).clamp(0, 1),
+    );
     setState(() {
-      _trazos.last.puntos.add(punto / lado);
+      _trazos.last.puntos.add(normalizado);
       _revision++;
     });
   }
@@ -44,10 +135,35 @@ class _EditorDibujoScreenState extends State<EditorDibujoScreen> {
                 style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 20),
-              const TextField(
-                decoration: InputDecoration(
+              TextField(
+                controller: _nombre,
+                enabled: !_guardando,
+                maxLength: 60,
+                decoration: const InputDecoration(
                   labelText: 'Nombre de la criatura',
                   hintText: 'Mi nueva criatura',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _tipo,
+                enabled: !_guardando,
+                maxLength: 30,
+                decoration: const InputDecoration(
+                  labelText: 'Tipo',
+                  hintText: 'Agua, aire…',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _descripcion,
+                enabled: !_guardando,
+                maxLength: 500,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Descripción',
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -114,7 +230,7 @@ class _EditorDibujoScreenState extends State<EditorDibujoScreen> {
                         child: ColoredBox(
                           color: colors.surfaceContainerHighest,
                           child: CustomPaint(
-                            painter: _PintorDeTrazos(_trazos, _revision),
+                            painter: PintorDibujo(_trazos, revision: _revision),
                             child: Center(
                               child: _trazos.isEmpty
                                   ? Text(
@@ -137,7 +253,7 @@ class _EditorDibujoScreenState extends State<EditorDibujoScreen> {
                 spacing: 8,
                 children: [
                   TextButton.icon(
-                    onPressed: _trazos.isEmpty
+                    onPressed: _guardando || _trazos.isEmpty
                         ? null
                         : () => setState(() {
                             _trazos.removeLast();
@@ -147,7 +263,7 @@ class _EditorDibujoScreenState extends State<EditorDibujoScreen> {
                     label: const Text('Deshacer'),
                   ),
                   TextButton.icon(
-                    onPressed: _trazos.isEmpty
+                    onPressed: _guardando || _trazos.isEmpty
                         ? null
                         : () => setState(() {
                             _trazos.clear();
@@ -160,14 +276,9 @@ class _EditorDibujoScreenState extends State<EditorDibujoScreen> {
               ),
               const SizedBox(height: 12),
               FilledButton.icon(
-                onPressed: null,
+                onPressed: _guardando ? null : _guardar,
                 icon: const Icon(Icons.save_outlined),
-                label: const Text('Guardar criatura'),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'El guardado de criaturas en Firebase está pendiente.',
-                style: TextStyle(color: colors.onSurfaceVariant),
+                label: Text(_guardando ? 'Guardando…' : 'Guardar criatura'),
               ),
             ],
           ),
@@ -175,49 +286,4 @@ class _EditorDibujoScreenState extends State<EditorDibujoScreen> {
       ),
     );
   }
-}
-
-class _Trazo {
-  _Trazo(this.color, Offset inicio) : puntos = [inicio];
-
-  final Color color;
-  final List<Offset> puntos;
-}
-
-class _PintorDeTrazos extends CustomPainter {
-  const _PintorDeTrazos(this.trazos, this.revision);
-
-  final List<_Trazo> trazos;
-  final int revision;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final pincel = Paint()
-      ..strokeWidth = 4
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..style = PaintingStyle.stroke;
-    final relleno = Paint();
-
-    for (final trazo in trazos) {
-      pincel.color = trazo.color;
-      relleno.color = trazo.color;
-      final inicio = trazo.puntos.first * size.width;
-      if (trazo.puntos.length == 1) {
-        canvas.drawCircle(inicio, pincel.strokeWidth / 2, relleno);
-        continue;
-      }
-
-      final ruta = Path()..moveTo(inicio.dx, inicio.dy);
-      for (var indice = 1; indice < trazo.puntos.length; indice++) {
-        final punto = trazo.puntos[indice] * size.width;
-        ruta.lineTo(punto.dx, punto.dy);
-      }
-      canvas.drawPath(ruta, pincel);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _PintorDeTrazos anterior) =>
-      revision != anterior.revision;
 }

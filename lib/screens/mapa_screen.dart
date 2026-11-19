@@ -4,9 +4,11 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../data/criaturas_demo.dart';
-import '../data/criaturas_nfc.dart';
+import '../models/criatura.dart';
+import '../data/datos_app.dart';
 import '../data/ubicacion_mapa.dart';
+import '../widgets/dibujo_criatura.dart';
+import '../widgets/recarga_firebase.dart';
 
 class MapaScreen extends StatelessWidget {
   const MapaScreen({
@@ -17,7 +19,7 @@ class MapaScreen extends StatelessWidget {
   });
 
   final Widget controles;
-  final CriaturaDemo? criaturaDestacada;
+  final Criatura? criaturaDestacada;
   final MapaGeografico? mapaGeografico;
 
   @override
@@ -39,15 +41,9 @@ class MapaScreen extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    if (mapaGeografico == null)
-                      Image.asset(
-                        'assets/images/mapa_demo.png',
-                        fit: BoxFit.cover,
-                      )
-                    else
-                      ColoredBox(
-                        color: Theme.of(context).colorScheme.surfaceContainer,
-                      ),
+                    ColoredBox(
+                      color: Theme.of(context).colorScheme.surfaceContainer,
+                    ),
                     Column(
                       children: [
                         Expanded(child: mapaGeografico ?? _marcadores(context)),
@@ -76,29 +72,32 @@ class MapaScreen extends StatelessWidget {
   );
 
   Widget _marcadores(BuildContext context) {
-    final colores = Theme.of(context).colorScheme;
-    return Stack(
-      children: [
-        for (final (indice, alineacion) in const [
-          (0, Alignment(-0.6, -0.5)),
-          (1, Alignment(0.6, -0.05)),
-          (2, Alignment(-0.35, 0.65)),
-        ])
-          Align(
-            alignment: alineacion,
-            child: _MarcadorCriatura(
-              criatura: criaturasDemo[indice],
-              destacada: criaturasDemo[indice] == criaturaDestacada,
-            ),
+    final datos = context.watch<DatosApp>();
+    return RecargaFirebase(
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          const Text(
+            'Activa tu ubicación para explorar el mapa.',
+            textAlign: TextAlign.center,
           ),
-        Align(
-          alignment: const Alignment(0.15, 0.3),
-          child: CircleAvatar(
-            backgroundColor: colores.secondary,
-            child: Icon(Icons.person, color: colores.onSecondary),
+          const SizedBox(height: 16),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              for (final criatura in datos.catalogo)
+                if (!datos.estaCapturada(criatura.id))
+                  _MarcadorCriatura(
+                    criatura: criatura,
+                    destacada: criatura.id == criaturaDestacada?.id,
+                  ),
+            ],
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -113,7 +112,7 @@ class MapaGeografico extends StatefulWidget {
 
   final LatLng posicion;
   final List<AparicionCercana> apariciones;
-  final CriaturaDemo? criaturaDestacada;
+  final Criatura? criaturaDestacada;
 
   @override
   State<MapaGeografico> createState() => MapaGeograficoState();
@@ -176,7 +175,8 @@ class MapaGeograficoState extends State<MapaGeografico> {
                 child: Center(
                   child: _MarcadorCriatura(
                     criatura: aparicion.criatura,
-                    destacada: aparicion.criatura == widget.criaturaDestacada,
+                    destacada:
+                        aparicion.criatura.id == widget.criaturaDestacada?.id,
                     compacto: true,
                   ),
                 ),
@@ -200,7 +200,7 @@ class _MarcadorCriatura extends StatelessWidget {
     this.compacto = false,
   });
 
-  final CriaturaDemo criatura;
+  final Criatura criatura;
   final bool destacada;
   final bool compacto;
 
@@ -208,8 +208,7 @@ class _MarcadorCriatura extends StatelessWidget {
   Widget build(BuildContext context) {
     final colores = Theme.of(context).colorScheme;
     final borde = BorderRadius.circular(20);
-    final recibida =
-        context.watch<CriaturasNfc?>()?.pendiente(criatura) ?? false;
+    final recibida = context.watch<DatosApp>().pendiente(criatura.id);
     return Semantics(
       button: true,
       selected: destacada,
@@ -233,10 +232,9 @@ class _MarcadorCriatura extends StatelessWidget {
                     label: 'Recibida por NFC',
                     child: Icon(Icons.nfc, size: 12, color: colores.onTertiary),
                   ),
-                  child: Icon(
-                    criatura.icono,
-                    size: compacto ? 24 : 36,
-                    color: destacada ? colores.onPrimary : colores.primary,
+                  child: DibujoCriatura(
+                    criatura: criatura,
+                    tamano: compacto ? 24 : 36,
                   ),
                 ),
                 Text(

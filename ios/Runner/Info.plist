@@ -26,6 +26,15 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.985282189962-ld9uffcodtmsbli05k0j7oue4s59oe14</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Selecciona una foto para tu perfil.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

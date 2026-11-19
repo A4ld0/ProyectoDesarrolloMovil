@@ -2,13 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pokemonchafa/data/criaturas_demo.dart';
+import 'package:pokemonchafa/models/criatura.dart';
+
+import 'datos_prueba.dart';
+
 import 'package:pokemonchafa/data/intercambio_nfc.dart';
 
 void main() {
   test('Confirma por NFC después de guardar la criatura', () async {
-    final criatura = criaturasDemo[1];
-    final guardando = Completer<CriaturaDemo>();
+    final criatura = criaturasPrueba[1];
+    final guardando = Completer<Criatura>();
     final guardado = Completer<void>();
     final comandos = <Uint8List>[];
 
@@ -27,6 +30,8 @@ void main() {
         guardando.complete(recibida);
         return guardado.future;
       },
+      buscar: (id) async =>
+          criaturasPrueba.where((c) => c.id == id).firstOrNull,
       activo: () => true,
     );
 
@@ -53,6 +58,8 @@ void main() {
           return Uint8List.fromList(mensaje);
         },
         guardar: (_) async => fail('No se debe guardar un mensaje inválido.'),
+        buscar: (id) async =>
+            criaturasPrueba.where((c) => c.id == id).firstOrNull,
         activo: () => true,
       );
       expect(recibida, isNull);
@@ -61,7 +68,7 @@ void main() {
   });
 
   test('Conserva la recepción si se pierde el enlace al confirmar', () async {
-    final criatura = criaturasDemo[2];
+    final criatura = criaturasPrueba[2];
     var guardada = false;
     final recibida = await ProtocoloCriaturaNfc.leer(
       transceive: (_) async {
@@ -73,6 +80,8 @@ void main() {
         ]);
       },
       guardar: (_) async => guardada = true,
+      buscar: (id) async =>
+          criaturasPrueba.where((c) => c.id == id).firstOrNull,
       activo: () => true,
     );
     expect(recibida, same(criatura));

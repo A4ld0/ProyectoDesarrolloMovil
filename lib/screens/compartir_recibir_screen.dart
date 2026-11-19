@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-import '../data/criaturas_demo.dart';
-import '../data/criaturas_nfc.dart';
+import '../models/criatura.dart';
+import '../data/datos_app.dart';
 import '../data/intercambio_nfc.dart';
+import '../widgets/dibujo_criatura.dart';
+import '../widgets/recarga_firebase.dart';
 
 enum _Modo { compartir, recibir }
 
@@ -25,7 +27,8 @@ class _CompartirRecibirScreenState extends State<CompartirRecibirScreen>
   _Modo? _activo;
   _Modo? _modoDelMensaje;
   String? _mensaje;
-  CriaturaDemo? _recibida;
+  Criatura? _recibida;
+  String? _seleccionId;
 
   @override
   void initState() {
@@ -50,9 +53,9 @@ class _CompartirRecibirScreenState extends State<CompartirRecibirScreen>
     super.dispose();
   }
 
-  Future<void> _iniciar(_Modo modo, CriaturaDemo seleccion) async {
+  Future<void> _iniciar(_Modo modo, Criatura? seleccion) async {
     if (_activo != null) return;
-    final almacen = context.read<CriaturasNfc>();
+    final almacen = context.read<DatosApp>();
     setState(() {
       _activo = modo;
       _mensaje = null;
@@ -60,16 +63,17 @@ class _CompartirRecibirScreenState extends State<CompartirRecibirScreen>
     });
 
     String? mensaje;
-    CriaturaDemo? recibida;
+    Criatura? recibida;
     try {
       if (modo == _Modo.compartir) {
+        if (seleccion == null) return;
         if (await _intercambio.compartir(seleccion)) {
           mensaje = '${seleccion.nombre} se envió correctamente.';
         }
       } else {
-        recibida = await _intercambio.recibir(almacen.recibir);
+        recibida = await _intercambio.recibir(almacen.recibir, almacen.buscar);
         if (recibida != null) {
-          mensaje = almacen.pendiente(recibida)
+          mensaje = almacen.pendiente(recibida.id)
               ? '${recibida.nombre} llegó a tu mapa. Puedes capturarla allí.'
               : '${recibida.nombre} ya está en tu colección.';
         }
@@ -81,6 +85,8 @@ class _CompartirRecibirScreenState extends State<CompartirRecibirScreen>
     } on PlatformException {
       mensaje =
           'No se pudo iniciar el intercambio por NFC. Inténtalo de nuevo.';
+    } catch (_) {
+      mensaje = 'No se pudo consultar la criatura. Revisa tu conexión.';
     } finally {
       if (mounted) {
         setState(() {
@@ -96,9 +102,11 @@ class _CompartirRecibirScreenState extends State<CompartirRecibirScreen>
   @override
   Widget build(BuildContext context) {
     final argumento = ModalRoute.of(context)?.settings.arguments;
-    final criatura = argumento is CriaturaDemo
-        ? argumento
-        : criaturasDemo.first;
+    final datos = context.watch<DatosApp>();
+    final id = _seleccionId ?? (argumento is Criatura ? argumento.id : null);
+    final criatura = id == null
+        ? (datos.catalogo.isEmpty ? null : datos.catalogo.first)
+        : datos.porId(id);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Compartir y recibir'),
@@ -120,12 +128,12 @@ class _CompartirRecibirScreenState extends State<CompartirRecibirScreen>
     );
   }
 
-  Widget _panel(_Modo modo, CriaturaDemo seleccion) {
+  Widget _panel(_Modo modo, Criatura? seleccion) {
     final comparte = modo == _Modo.compartir;
     final criatura = comparte ? seleccion : _recibida;
     final sigueEnMapa = criatura == null || comparte
         ? false
-        : context.watch<CriaturasNfc>().pendiente(criatura);
+        : context.watch<DatosApp>().pendiente(criatura.id);
     final colores = Theme.of(context).colorScheme;
     final esperando = _activo == modo;
     final mensaje = _modoDelMensaje == modo ? _mensaje : null;
@@ -133,78 +141,112 @@ class _CompartirRecibirScreenState extends State<CompartirRecibirScreen>
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 600),
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            Text(
-              comparte ? 'Comparte tu criatura' : 'Recibe una criatura',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 16),
-            if (criatura != null)
-              Card(
-                color: colores.primaryContainer,
-                child: ListTile(
-                  leading: Icon(
-                    criatura.icono,
-                    color: colores.onPrimaryContainer,
-                  ),
-                  title: Text(criatura.nombre),
-                  subtitle: Text('Tipo ${criatura.tipo}'),
-                ),
-              ),
-            const SizedBox(height: 12),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.nfc),
-              title: const Text('Intercambio NFC'),
-              subtitle: Text(
-                comparte
-                    ? 'En el otro Android, abre Recibir y toca Buscar criatura.'
-                    : 'En el otro Android, abre Compartir y toca Empezar a compartir.',
-              ),
-            ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              icon: const Icon(Icons.nfc),
-              label: Text(comparte ? 'Empezar a compartir' : 'Buscar criatura'),
-              onPressed: _activo == null
-                  ? () => _iniciar(modo, seleccion)
-                  : null,
-            ),
-            if (esperando) ...[
-              const SizedBox(height: 12),
-              const LinearProgressIndicator(),
-              const SizedBox(height: 12),
+        child: RecargaFirebase(
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(24),
+            children: [
               Text(
-                'Mantén ambos teléfonos desbloqueados y acerca la parte trasera.',
-                style: TextStyle(color: colores.onSurfaceVariant),
+                comparte ? 'Comparte tu criatura' : 'Recibe una criatura',
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
-              TextButton(
-                onPressed: _cancelar,
-                child: const Text('Cancelar intercambio'),
-              ),
-            ],
-            if (mensaje != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Semantics(liveRegion: true, child: Text(mensaje)),
-              ),
-            if (!comparte && criatura != null && mensaje != null)
-              OutlinedButton.icon(
-                icon: Icon(
-                  sigueEnMapa ? Icons.map_outlined : Icons.inventory_2_outlined,
+              const SizedBox(height: 16),
+              if (comparte &&
+                  context.watch<DatosApp>().catalogo.isNotEmpty) ...[
+                DropdownButtonFormField<String>(
+                  key: ValueKey(seleccion?.id),
+                  initialValue: seleccion?.id,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Criatura',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    for (final opcion in context.watch<DatosApp>().catalogo)
+                      DropdownMenuItem(
+                        value: opcion.id,
+                        child: Text(
+                          opcion.nombre,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: _activo != null
+                      ? null
+                      : (id) => setState(() => _seleccionId = id),
                 ),
-                label: Text(sigueEnMapa ? 'Volver al mapa' : 'Ver colección'),
-                onPressed: () {
-                  final navegador = Navigator.of(context);
-                  navegador.popUntil(
-                    (route) => route.settings.name == '/mapa' || route.isFirst,
-                  );
-                  if (!sigueEnMapa) navegador.pushNamed('/coleccion');
-                },
+                const SizedBox(height: 12),
+              ],
+              if (criatura != null)
+                Card(
+                  color: colores.primaryContainer,
+                  child: ListTile(
+                    leading: DibujoCriatura(criatura: criatura, tamano: 40),
+                    title: Text(criatura.nombre),
+                    subtitle: Text('Tipo ${criatura.tipo}'),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.nfc),
+                title: const Text('Intercambio NFC'),
+                subtitle: Text(
+                  comparte
+                      ? 'En el otro Android, abre Recibir y toca Buscar criatura.'
+                      : 'En el otro Android, abre Compartir y toca Empezar a compartir.',
+                ),
               ),
-          ],
+              const Text(
+                'Ambos teléfonos necesitan conexión para cargar y guardar la criatura.',
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                icon: const Icon(Icons.nfc),
+                label: Text(
+                  comparte ? 'Empezar a compartir' : 'Buscar criatura',
+                ),
+                onPressed: _activo == null && (!comparte || seleccion != null)
+                    ? () => _iniciar(modo, seleccion)
+                    : null,
+              ),
+              if (esperando) ...[
+                const SizedBox(height: 12),
+                const LinearProgressIndicator(),
+                const SizedBox(height: 12),
+                Text(
+                  'Mantén ambos teléfonos desbloqueados y acerca la parte trasera.',
+                  style: TextStyle(color: colores.onSurfaceVariant),
+                ),
+                TextButton(
+                  onPressed: _cancelar,
+                  child: const Text('Cancelar intercambio'),
+                ),
+              ],
+              if (mensaje != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Semantics(liveRegion: true, child: Text(mensaje)),
+                ),
+              if (!comparte && criatura != null && mensaje != null)
+                OutlinedButton.icon(
+                  icon: Icon(
+                    sigueEnMapa
+                        ? Icons.map_outlined
+                        : Icons.inventory_2_outlined,
+                  ),
+                  label: Text(sigueEnMapa ? 'Volver al mapa' : 'Ver colección'),
+                  onPressed: () {
+                    final navegador = Navigator.of(context);
+                    navegador.popUntil(
+                      (route) =>
+                          route.settings.name == '/mapa' || route.isFirst,
+                    );
+                    if (!sigueEnMapa) navegador.pushNamed('/coleccion');
+                  },
+                ),
+            ],
+          ),
         ),
       ),
     );

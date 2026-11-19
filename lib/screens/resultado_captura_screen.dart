@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../data/criaturas_demo.dart';
+import '../models/criatura.dart';
 import '../widgets/criatura_avatar.dart';
 
 class ResultadoCapturaScreen extends StatelessWidget {
@@ -9,9 +9,15 @@ class ResultadoCapturaScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final criatura =
-        ModalRoute.of(context)?.settings.arguments as CriaturaDemo? ??
-        criaturasDemo[0];
+    final criatura = ModalRoute.of(context)?.settings.arguments;
+    if (criatura is! Criatura) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Captura')),
+        body: const Center(
+          child: Text('Selecciona una criatura desde el mapa.'),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(

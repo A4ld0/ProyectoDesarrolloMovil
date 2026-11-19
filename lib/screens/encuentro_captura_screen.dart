@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../data/criaturas_demo.dart';
-import '../data/criaturas_nfc.dart';
+import '../models/criatura.dart';
+import '../data/datos_app.dart';
 import '../widgets/criatura_avatar.dart';
 
 class EncuentroCapturaScreen extends StatefulWidget {
@@ -15,21 +15,19 @@ class EncuentroCapturaScreen extends StatefulWidget {
 class _EncuentroCapturaScreenState extends State<EncuentroCapturaScreen> {
   bool _guardando = false;
 
-  Future<void> _capturar(CriaturaDemo criatura, CriaturasNfc almacen) async {
+  Future<void> _capturar(Criatura criatura, DatosApp almacen) async {
     if (_guardando) return;
-    if (almacen.pendiente(criatura)) {
-      setState(() => _guardando = true);
-      try {
-        await almacen.capturar(criatura);
-      } catch (_) {
-        if (mounted) {
-          setState(() => _guardando = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No se pudo guardar la captura.')),
-          );
-        }
-        return;
+    setState(() => _guardando = true);
+    try {
+      await almacen.capturar(criatura);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _guardando = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo guardar la captura.')),
+        );
       }
+      return;
     }
 
     if (mounted) {
@@ -44,11 +42,17 @@ class _EncuentroCapturaScreenState extends State<EncuentroCapturaScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final almacen = context.watch<CriaturasNfc>();
+    final almacen = context.watch<DatosApp>();
     // Recibe la criatura que se tocó en el mapa.
-    final criatura =
-        ModalRoute.of(context)?.settings.arguments as CriaturaDemo? ??
-        criaturasDemo[0];
+    final criatura = ModalRoute.of(context)?.settings.arguments;
+    if (criatura is! Criatura) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Encuentro')),
+        body: const Center(
+          child: Text('Selecciona una criatura desde el mapa.'),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -82,7 +86,7 @@ class _EncuentroCapturaScreenState extends State<EncuentroCapturaScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(color: colors.onSurfaceVariant),
               ),
-              if (almacen.pendiente(criatura))
+              if (almacen.pendiente(criatura.id))
                 const Text('Recibida por NFC', textAlign: TextAlign.center),
               const SizedBox(height: 32),
               FilledButton.icon(

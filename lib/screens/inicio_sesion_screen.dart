@@ -1,247 +1,264 @@
-import 'package:flutter/material.dart';
-// firebase_auth: lo usamos para iniciar sesión, registrar usuarios y entrar con Google
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:provider/provider.dart';
 
-// Pasa a Stateful para poder leer lo que se escribe en los TextField
+import '../data/datos_app.dart';
+import '../firebase_options.dart';
+
 class InicioSesionScreen extends StatefulWidget {
   const InicioSesionScreen({super.key});
-
   @override
   State<InicioSesionScreen> createState() => _InicioSesionScreenState();
 }
 
 class _InicioSesionScreenState extends State<InicioSesionScreen> {
-  // Controladores para leer el correo y la contraseña
-  final _correoController = TextEditingController();
-  final _contrasenaController = TextEditingController();
+  final _formulario = GlobalKey<FormState>();
+  final _correo = TextEditingController();
+  final _contrasena = TextEditingController();
+  final _nombre = TextEditingController();
+  bool _registrando = false;
+  bool _ocupado = false;
+  String? _mensaje;
 
   @override
   void dispose() {
-    _correoController.dispose();
-    _contrasenaController.dispose();
+    _correo.dispose();
+    _contrasena.dispose();
+    _nombre.dispose();
     super.dispose();
   }
 
-  Future<void> _mostrarAcceso(BuildContext context, String metodo) async {
+  Future<void> _ejecutar(Future<void> Function() accion) async {
+    if (_ocupado) return;
     FocusScope.of(context).unfocus();
-    final continuar = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Funcionalidad pendiente'),
-        content: Text('El acceso con $metodo está pendiente.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Volver'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Continuar'),
-          ),
-        ],
-      ),
-    );
-
-    if (continuar == true && context.mounted) {
-      Navigator.pushReplacementNamed(context, '/permisos');
+    setState(() {
+      _ocupado = true;
+      _mensaje = null;
+    });
+    try {
+      await accion();
+    } on FirebaseAuthException catch (error) {
+      if (mounted)
+        setState(
+          () => _mensaje = switch (error.code) {
+            'invalid-credential' ||
+            'wrong-password' ||
+            'user-not-found' => 'Revisa tu correo y contraseña.',
+            'email-already-in-use' =>
+              'Este correo ya tiene una cuenta. Inicia sesión.',
+            'weak-password' => 'Usa una contraseña de al menos 6 caracteres.',
+            'too-many-requests' =>
+              'Espera un momento antes de volver a intentar.',
+            'network-request-failed' => 'Revisa tu conexión a internet.',
+            'user-disabled' => 'Esta cuenta está deshabilitada.',
+            _ => 'No se pudo completar el acceso. Inténtalo de nuevo.',
+          },
+        );
+    } catch (_) {
+      if (mounted)
+        setState(
+          () =>
+              _mensaje = 'No se pudo completar el acceso. Inténtalo de nuevo.',
+        );
+    } finally {
+      if (mounted) setState(() => _ocupado = false);
     }
   }
 
-  // Función para mostrar un error en una alerta simple
-  void _mostrarError(String mensaje) {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('No se pudo entrar'),
-        content: Text(mensaje),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Entendido'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _entrar() async {
+    if (!_formulario.currentState!.validate()) return;
+    final datos = context.read<DatosApp>();
+    final correo = _correo.text.trim();
+    final contrasena = _contrasena.text;
+    final nombre = _nombre.text.trim();
+    final registrando = _registrando;
+    await _ejecutar(() async {
+      if (registrando) {
+        await datos.registrar(
+          correo: correo,
+          contrasena: contrasena,
+          nombre: nombre,
+        );
+      } else {
+        await datos.auth.signInWithEmailAndPassword(
+          email: correo,
+          password: contrasena,
+        );
+      }
+    });
   }
 
-  // Función para iniciar sesión con correo y contraseña en Firebase
-  Future<void> _iniciarConCorreo() async {
-    FocusScope.of(context).unfocus();
-    final correo = _correoController.text.trim();
-    final contrasena = _contrasenaController.text;
-
-    if (correo.isEmpty || contrasena.isEmpty) {
-      _mostrarError('Escribe tu correo y tu contraseña.');
+  Future<void> _google() => _ejecutar(() async {
+    final auth = context.read<DatosApp>().auth;
+    if (kIsWeb) {
+      await auth.signInWithPopup(GoogleAuthProvider());
       return;
     }
-
-    try {
-      // Mandamos a llamar Firebase para iniciar sesión
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: correo,
-        password: contrasena,
-      );
-      if (mounted) Navigator.pushReplacementNamed(context, '/permisos');
-    } on FirebaseAuthException catch (e) {
-      // Firebase responde con un "code" que nos dice qué falló
-      if (e.code == 'invalid-credential' || e.code == 'user-not-found') {
-        // Puede que el usuario no exista: ofrecemos crear la cuenta
-        await _ofrecerRegistro(correo, contrasena);
-      } else {
-        _mostrarError(e.message ?? 'Ocurrió un error (${e.code}).');
-      }
-    }
-  }
-
-  // Función para registrar un usuario nuevo si el usuario acepta
-  Future<void> _ofrecerRegistro(String correo, String contrasena) async {
-    final crear = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('¿Crear cuenta?'),
-        content: Text(
-          'No encontramos una cuenta con esos datos.\n\n'
-          '¿Quieres crear una cuenta nueva con $correo?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Volver'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Crear cuenta'),
-          ),
-        ],
+    final cuenta = await GoogleSignIn(
+      clientId: defaultTargetPlatform == TargetPlatform.iOS
+          ? DefaultFirebaseOptions.ios.iosClientId
+          : null,
+    ).signIn();
+    if (cuenta == null) return;
+    final tokens = await cuenta.authentication;
+    await auth.signInWithCredential(
+      GoogleAuthProvider.credential(
+        idToken: tokens.idToken,
+        accessToken: tokens.accessToken,
       ),
     );
-    if (crear != true) return;
+  });
 
-    try {
-      // Mandamos a llamar Firebase para crear el usuario (queda con sesión iniciada)
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: correo,
-        password: contrasena,
+  Future<void> _recuperar() async {
+    final auth = context.read<DatosApp>().auth;
+    final correo = _correo.text.trim();
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(_correo.text.trim())) {
+      setState(
+        () =>
+            _mensaje = 'Escribe un correo válido para recuperar tu contraseña.',
       );
-      if (mounted) Navigator.pushReplacementNamed(context, '/permisos');
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'email-already-in-use') {
-        // El correo sí existe, entonces lo que falló fue la contraseña
-        _mostrarError('La contraseña es incorrecta.');
-      } else if (e.code == 'weak-password') {
-        _mostrarError('La contraseña debe tener al menos 6 caracteres.');
-      } else {
-        _mostrarError(e.message ?? 'Ocurrió un error (${e.code}).');
-      }
+      return;
     }
-  }
-
-  // Función para iniciar sesión con la cuenta de Google
-  Future<void> _iniciarConGoogle() async {
-    try {
-      // signInWithProvider abre la ventana de Google y regresa con la sesión
-      await FirebaseAuth.instance.signInWithProvider(GoogleAuthProvider());
-      if (mounted) Navigator.pushReplacementNamed(context, '/permisos');
-    } on FirebaseAuthException catch (e) {
-      // Si el usuario cierra la ventana no mostramos nada
-      if (e.code != 'canceled' && e.code != 'web-context-canceled') {
-        _mostrarError(e.message ?? 'Ocurrió un error (${e.code}).');
-      }
-    }
+    await _ejecutar(() async {
+      await auth.sendPasswordResetEmail(email: correo);
+      if (mounted)
+        setState(() => _mensaje = 'Revisa tu correo para recuperar el acceso.');
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final colores = Theme.of(context).colorScheme;
     return Scaffold(
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
-            child: ListView(
-              shrinkWrap: true,
-              padding: const EdgeInsets.all(24),
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              children: [
-                CircleAvatar(
-                  radius: 36,
-                  backgroundColor: colors.primaryContainer,
-                  child: Icon(
-                    Icons.pets_rounded,
-                    size: 40,
-                    color: colors.primary,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'pokemonchafa',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    color: colors.secondary,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                TextField(
-                  controller: _correoController,
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.next,
-                  autocorrect: false,
-                  decoration: const InputDecoration(
-                    labelText: 'Correo electrónico',
-                    hintText: 'nombre@ejemplo.com',
-                    prefixIcon: Icon(Icons.mail_outline),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _contrasenaController,
-                  obscureText: true,
-                  enableSuggestions: false,
-                  autocorrect: false,
-                  decoration: const InputDecoration(
-                    labelText: 'Contraseña',
-                    prefixIcon: Icon(Icons.lock_outline),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                FilledButton(
-                  onPressed: _iniciarConCorreo,
-                  child: const Text('Iniciar sesión'),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    const Expanded(child: Divider()),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(
-                        'O continúa con',
-                        style: TextStyle(color: colors.onSurfaceVariant),
-                      ),
+            child: Form(
+              key: _formulario,
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.all(24),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                children: [
+                  CircleAvatar(
+                    radius: 36,
+                    backgroundColor: colores.primaryContainer,
+                    child: Icon(
+                      Icons.pets_rounded,
+                      size: 40,
+                      color: colores.primary,
                     ),
-                    const Expanded(child: Divider()),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _iniciarConGoogle,
-                  icon: const Text(
-                    'G',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
-                  label: const Text('Continuar con Google'),
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: () => _mostrarAcceso(context, 'Apple'),
-                  icon: const Icon(Icons.apple),
-                  label: const Text('Continuar con Apple'),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  Text(
+                    'pokemonchafa',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      color: colores.secondary,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  if (_registrando) ...[
+                    TextFormField(
+                      controller: _nombre,
+                      maxLength: 60,
+                      enabled: !_ocupado,
+                      decoration: const InputDecoration(
+                        labelText: 'Nombre',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (valor) =>
+                          valor!.trim().isEmpty ? 'Escribe tu nombre.' : null,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  TextFormField(
+                    controller: _correo,
+                    enabled: !_ocupado,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    autocorrect: false,
+                    decoration: const InputDecoration(
+                      labelText: 'Correo electrónico',
+                      prefixIcon: Icon(Icons.mail_outline),
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (valor) =>
+                        RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                            .hasMatch(valor!.trim())
+                        ? null
+                        : 'Escribe un correo válido.',
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _contrasena,
+                    enabled: !_ocupado,
+                    obscureText: true,
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    decoration: const InputDecoration(
+                      labelText: 'Contraseña',
+                      prefixIcon: Icon(Icons.lock_outline),
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (valor) => valor!.length < 6
+                        ? 'Escribe al menos 6 caracteres.'
+                        : null,
+                    onFieldSubmitted: (_) => _entrar(),
+                  ),
+                  const SizedBox(height: 20),
+                  if (_mensaje != null) ...[
+                    Text(_mensaje!, textAlign: TextAlign.center),
+                    const SizedBox(height: 12),
+                  ],
+                  FilledButton(
+                    onPressed: _ocupado ? null : _entrar,
+                    child: _ocupado
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(
+                            _registrando ? 'Crear cuenta' : 'Iniciar sesión',
+                          ),
+                  ),
+                  TextButton(
+                    onPressed: _ocupado
+                        ? null
+                        : () => setState(() {
+                            _registrando = !_registrando;
+                            _mensaje = null;
+                            _formulario.currentState?.reset();
+                          }),
+                    child: Text(
+                      _registrando ? 'Ya tengo una cuenta' : 'Registrarme',
+                    ),
+                  ),
+                  if (!_registrando)
+                    TextButton(
+                      onPressed: _ocupado ? null : _recuperar,
+                      child: const Text('Olvidé mi contraseña'),
+                    ),
+                  const SizedBox(height: 12),
+                  if (kIsWeb ||
+                      defaultTargetPlatform == TargetPlatform.android ||
+                      defaultTargetPlatform == TargetPlatform.iOS)
+                    OutlinedButton.icon(
+                      onPressed: _ocupado ? null : _google,
+                      icon: const Text(
+                        'G',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      label: const Text('Continuar con Google'),
+                    ),
+                ],
+              ),
             ),
           ),
         ),

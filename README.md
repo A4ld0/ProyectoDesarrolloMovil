@@ -42,9 +42,7 @@ desbloqueados. El teléfono que envía también debe admitir
 
 El receptor guarda la criatura en el dispositivo, la distingue con el icono NFC
 en el mapa y puede capturarla para agregarla a **Colección**. Recibir la misma
-criatura otra vez conserva su estado. El intercambio funciona sin conexión y
-comparte las criaturas del catálogo actual. Los dibujos del editor todavía no
-se guardan ni se pueden compartir.
+criatura otra vez conserva su estado. El intercambio consulta la criatura en Firestore y guarda la recepción en la cuenta del usuario. Ambos teléfonos necesitan conexión. Los dibujos se guardan en Firestore y se pueden compartir.
 
 ## Getting Started
 
