@@ -12,8 +12,6 @@ class IntroduccionPermisosScreen extends StatefulWidget {
 
 class _IntroduccionPermisosScreenState
     extends State<IntroduccionPermisosScreen> {
-  // Solo cambian el texto de los botones. No solicitan permisos del teléfono.
-  bool ubicacionSimulada = false;
   bool camaraSimulada = false;
 
   @override
@@ -42,12 +40,18 @@ class _IntroduccionPermisosScreenState
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            _permiso(
-              icono: Icons.location_on_outlined,
-              titulo: 'Ubicación',
-              descripcion: 'Para encontrar criaturas cerca de ti.',
-              activado: ubicacionSimulada,
-              onPressed: () => setState(() => ubicacionSimulada = true),
+            Card(
+              elevation: 0,
+              child: ListTile(
+                leading: Icon(
+                  Icons.location_on_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                title: const Text('Ubicación'),
+                subtitle: const Text(
+                  'En el mapa, toca «Usar mi ubicación» para ver qué criaturas tienes cerca.',
+                ),
+              ),
             ),
             _permiso(
               icono: Icons.camera_alt_outlined,

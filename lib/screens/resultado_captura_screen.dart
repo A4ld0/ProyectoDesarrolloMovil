@@ -53,13 +53,10 @@ class ResultadoCapturaScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
-                onPressed: () => Navigator.pushNamedAndRemoveUntil(
-                  context,
-                  '/creaciones',
-                  (route) => false,
-                ),
-                icon: const Icon(Icons.brush_outlined),
-                label: const Text('Ver mis creaciones'),
+                onPressed: () =>
+                    Navigator.pushReplacementNamed(context, '/coleccion'),
+                icon: const Icon(Icons.inventory_2_outlined),
+                label: const Text('Ver colección'),
               ),
             ],
           ),

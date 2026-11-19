@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../data/criaturas_demo.dart';
+
 class MisCreacionesScreen extends StatelessWidget {
   const MisCreacionesScreen({super.key});
   @override
@@ -60,11 +62,7 @@ class MisCreacionesScreen extends StatelessWidget {
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              for (final creature in const [
-                ('Nubin', Icons.cloud_rounded),
-                ('Burbujin', Icons.water_drop_rounded),
-                ('Estelin', Icons.star_rounded),
-              ])
+              for (final criatura in criaturasDemo)
                 Card(
                   elevation: 0,
                   color: colors.surface,
@@ -81,14 +79,14 @@ class MisCreacionesScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Icon(
-                            creature.$2,
+                            criatura.icono,
                             size: 72,
                             color: colors.primary,
                           ),
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          creature.$1,
+                          criatura.nombre,
                           style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -102,7 +100,7 @@ class MisCreacionesScreen extends StatelessWidget {
                           onPressed: () => Navigator.pushNamed(
                             context,
                             '/intercambio',
-                            arguments: creature.$1,
+                            arguments: criatura,
                           ),
                           icon: const Icon(Icons.ios_share),
                           label: const Text('Compartir criatura'),

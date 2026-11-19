@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pokemonchafa/data/criaturas_demo.dart';
+import 'package:pokemonchafa/data/criaturas_nfc.dart';
+import 'package:pokemonchafa/data/intercambio_nfc.dart';
 import 'package:pokemonchafa/main.dart';
 import 'package:pokemonchafa/screens/editor_dibujo_screen.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 import 'firebase_test_setup.dart';
 
@@ -15,7 +20,7 @@ Future<void> mostrar(WidgetTester tester, Finder elemento) async {
 }
 
 Future<void> abrirPermisos(WidgetTester tester) async {
-  await tester.pumpWidget(const MyApp());
+  await tester.pumpWidget(await MyApp.cargar());
   await rellenarCorreo(tester);
   await mostrar(tester, find.text('Iniciar sesión'));
   await tester.tap(find.text('Iniciar sesión'));
@@ -34,9 +39,27 @@ Future<void> abrirMapa(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> abrirDesdeMenu(WidgetTester tester, String seccion) async {
+  await tester.tap(find.widgetWithText(FilledButton, 'Menú'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.widgetWithText(ListTile, seccion));
+  await tester.pumpAndSettle();
+}
+
+Future<void> abrirAjustes(WidgetTester tester) async {
+  await tester.tap(find.widgetWithText(FilledButton, 'Perfil'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.widgetWithText(ListTile, 'Ajustes'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(prepararFirebaseDePruebas);
+  setUp(() {
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+  });
 
   for (final opcion in [
     ('Iniciar sesión', 'correo y contraseña'),
@@ -50,7 +73,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      await tester.pumpWidget(const MyApp());
+      await tester.pumpWidget(await MyApp.cargar());
       expect(find.text('Correo electrónico'), findsOneWidget);
       expect(find.text('Contraseña'), findsOneWidget);
       expect(
@@ -79,31 +102,63 @@ void main() {
     });
   }
 
-  testWidgets('La navegacion compartida incluye las cinco secciones', (
+  testWidgets('El menú abre las secciones sobre la misma ruta del mapa', (
     tester,
   ) async {
     await abrirMapa(tester);
-    expect(find.byType(BottomNavigationBar), findsOneWidget);
-    expect(find.byType(NavigationBar), findsNothing);
-    final barra = tester.widget<BottomNavigationBar>(
-      find.byType(BottomNavigationBar),
-    );
-    expect(barra.items.map((item) => item.label).toList(), [
-      'Mapa',
-      'Guía',
-      'Creaciones',
-      'Colección',
-      'Ajustes',
-    ]);
+    final mapa = find.widgetWithText(AppBar, 'Mapa');
+    final instancia = tester.element(mapa);
 
-    await tester.tap(find.text('Creaciones'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Menú'));
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(AppBar, 'Mis creaciones'), findsOneWidget);
-    expect(find.byType(BottomNavigationBar), findsOneWidget);
-    expect(find.byType(NavigationBar), findsNothing);
-    await tester.tap(find.text('Mapa'));
+    expect(mapa, findsOneWidget);
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(AppBar, 'Mapa'), findsOneWidget);
+
+    for (final (seccion, titulo) in [
+      ('Guía', 'enciclopedia global'),
+      ('Colección', 'mis capturas'),
+      ('Creaciones', 'Mis creaciones'),
+    ]) {
+      await abrirDesdeMenu(tester, seccion);
+      expect(find.widgetWithText(AppBar, titulo), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(tester.element(mapa), same(instancia));
+    }
+
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Cerca de ti destaca el marcador y conserva la selección', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await abrirMapa(tester);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Cerca de ti'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(ListTile, 'Nubin'), findsOneWidget);
+    expect(find.widgetWithText(ListTile, 'Estelin'), findsOneWidget);
+    await tester.tap(find.widgetWithText(ListTile, 'Burbujin'));
+    await tester.pumpAndSettle();
+    final marcador = find.ancestor(
+      of: find.text('Burbujin'),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is Semantics && widget.properties.selected == true,
+      ),
+    );
+    expect(marcador, findsOneWidget);
+
+    await tester.tap(find.text('Burbujin'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(AppBar, 'Captura la criatura'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(marcador, findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -115,10 +170,8 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await abrirMapa(tester);
-    await tester.tap(find.text('Ajustes'));
-    await tester.pumpAndSettle();
+    await abrirAjustes(tester);
     expect(find.widgetWithText(AppBar, 'Ajustes'), findsOneWidget);
-    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
     final modoOscuro = find.widgetWithText(SwitchListTile, 'Modo oscuro');
     expect(tester.widget<SwitchListTile>(modoOscuro).value, isFalse);
     await tester.tap(find.text('Modo oscuro'));
@@ -150,14 +203,13 @@ void main() {
       Theme.of(tester.element(find.byType(AppBar))).brightness,
       Brightness.dark,
     );
-    await mostrar(tester, find.text('Simular permiso de Ubicación'));
-    await tester.tap(find.text('Simular permiso de Ubicación'));
-    await tester.pumpAndSettle();
-    expect(find.text('Ubicación simulada'), findsOneWidget);
+    expect(
+      find.textContaining('En el mapa, toca «Usar mi ubicación»'),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Volver a ajustes'));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(AppBar, 'Ajustes'), findsOneWidget);
-    expect(find.byType(BottomNavigationBar), findsOneWidget);
 
     await mostrar(tester, find.text('Acerca de'));
     await tester.tap(find.text('Acerca de'));
@@ -166,15 +218,17 @@ void main() {
     expect(find.textContaining('Versión 1.0.0'), findsOneWidget);
     await tester.tap(find.text('Cerrar'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Mapa'));
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(AppBar, 'Perfil'), findsOneWidget);
+    await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.widgetWithText(AppBar, 'Mapa'), findsOneWidget);
     expect(
       Theme.of(tester.element(find.byType(AppBar))).brightness,
       Brightness.dark,
     );
-    await tester.tap(find.text('Ajustes'));
-    await tester.pumpAndSettle();
+    await abrirAjustes(tester);
     expect(tester.widget<SwitchListTile>(modoOscuro).value, isTrue);
     await mostrar(tester, find.text('Modo oscuro'));
     await tester.tap(find.text('Modo oscuro'));
@@ -182,50 +236,54 @@ void main() {
     expect(Theme.of(tester.element(modoOscuro)).brightness, Brightness.light);
     expect(tester.widget<SwitchListTile>(modoOscuro).value, isFalse);
     expect(tester.takeException(), isNull);
-  });
 
-  testWidgets('Cerrar sesión pide confirmación y vuelve al inicio', (
-    tester,
-  ) async {
-    await abrirMapa(tester);
-    await tester.tap(find.text('Ajustes'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Modo oscuro'));
-    await tester.pumpAndSettle();
-    await mostrar(tester, find.text('Cerrar sesión'));
-    await tester.tap(find.text('Cerrar sesión'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Cancelar'));
-    await tester.pumpAndSettle();
-    expect(find.widgetWithText(AppBar, 'Ajustes'), findsOneWidget);
-    await tester.tap(find.text('Cerrar sesión'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Cerrar sesión'));
-    await tester.pumpAndSettle();
-    expect(find.text('Iniciar sesión'), findsOneWidget);
-    expect(
-      Theme.of(tester.element(find.text('Iniciar sesión'))).brightness,
-      Brightness.dark,
-    );
-    expect(find.byType(BottomNavigationBar), findsNothing);
-    expect(
-      Navigator.of(tester.element(find.text('Iniciar sesión'))).canPop(),
-      isFalse,
-    );
-    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pumpWidget(const MyApp());
-    await tester.pumpAndSettle();
+    await tester.pumpWidget(await MyApp.cargar());
     expect(
       Theme.of(tester.element(find.text('Iniciar sesión'))).brightness,
       Brightness.light,
     );
   });
 
+  testWidgets(
+    'Cerrar sesión pide confirmación y el tema persiste al reiniciar',
+    (tester) async {
+      await abrirMapa(tester);
+      await abrirAjustes(tester);
+      await tester.tap(find.text('Modo oscuro'));
+      await tester.pumpAndSettle();
+      await mostrar(tester, find.text('Cerrar sesión'));
+      await tester.tap(find.text('Cerrar sesión'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(AppBar, 'Ajustes'), findsOneWidget);
+      await tester.tap(find.text('Cerrar sesión'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Cerrar sesión'));
+      await tester.pumpAndSettle();
+      expect(find.text('Iniciar sesión'), findsOneWidget);
+      expect(
+        Theme.of(tester.element(find.text('Iniciar sesión'))).brightness,
+        Brightness.dark,
+      );
+      expect(
+        Navigator.of(tester.element(find.text('Iniciar sesión'))).canPop(),
+        isFalse,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(await MyApp.cargar());
+      expect(
+        Theme.of(tester.element(find.text('Iniciar sesión'))).brightness,
+        Brightness.dark,
+      );
+    },
+  );
+
   testWidgets('Navegacion de las tres vistas', (tester) async {
     await abrirMapa(tester);
-    await tester.tap(find.text('Creaciones'));
-    await tester.pumpAndSettle();
+    await abrirDesdeMenu(tester, 'Creaciones');
     await tester.tap(find.byTooltip('Crear una criatura'));
     await tester.pumpAndSettle();
     expect(find.text('Editor de dibujo'), findsOneWidget);
@@ -234,35 +292,52 @@ void main() {
     await tester.tap(find.byTooltip('Compartir y recibir'));
     await tester.pumpAndSettle();
     expect(find.text('Comparte tu criatura'), findsOneWidget);
-    await tester.drag(find.text('Comparte tu criatura'), const Offset(0, -400));
+    await tester.tap(find.text('Empezar a compartir'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Probar compartir'));
-    await tester.pumpAndSettle();
-    expect(find.text('Compartir (prueba)'), findsOneWidget);
-    expect(
-      find.textContaining('no se activa NFC ni se envían datos'),
-      findsOneWidget,
-    );
-    await tester.tap(find.text('Entendido'));
-    await tester.pumpAndSettle();
+    expect(find.text(IntercambioNfc.mensajeSinNfc), findsOneWidget);
     await tester.tap(find.text('Recibir'));
     await tester.pumpAndSettle();
     expect(find.text('Recibe una criatura'), findsOneWidget);
-    await tester.drag(find.text('Recibe una criatura'), const Offset(0, -400));
+    await tester.tap(find.text('Buscar criatura'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Probar recibir'));
-    await tester.pumpAndSettle();
-    expect(find.text('Recibir (prueba)'), findsOneWidget);
-    expect(
-      find.textContaining('no se recibe ninguna criatura'),
-      findsOneWidget,
-    );
-    await tester.tap(find.text('Entendido'));
-    await tester.pumpAndSettle();
+    expect(find.text(IntercambioNfc.mensajeSinNfc), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.widgetWithText(AppBar, 'Mis creaciones'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(AppBar, 'Mapa'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Una criatura recibida se captura y queda en la colección', (
+    tester,
+  ) async {
+    final almacen = CriaturasNfc({});
+    addTearDown(almacen.dispose);
+    final criatura = criaturasDemo[1];
+    await almacen.recibir(criatura);
+    await almacen.recibir(criatura);
+
+    await abrirMapa(tester);
+    expect(find.byIcon(Icons.nfc), findsOneWidget);
+    await tester.tap(find.text(criatura.nombre));
+    await tester.pumpAndSettle();
+    expect(find.text('Recibida por NFC'), findsOneWidget);
+    await tester.tap(find.text('Capturar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ver colección'));
+    await tester.pumpAndSettle();
+    expect(find.text(criatura.nombre), findsOneWidget);
+    expect(find.text('Recibida por NFC'), findsOneWidget);
+
+    final estados = await CriaturasNfc.leer();
+    expect(estados, {criatura.id: EstadoCriaturaNfc.capturada});
+    final reiniciado = CriaturasNfc(estados);
+    addTearDown(reiniciado.dispose);
+    await reiniciado.recibir(criatura);
+    expect(reiniciado.pendiente(criatura), isFalse);
+    expect(reiniciado.capturadas, [criatura]);
   });
 
   testWidgets('Dibuja con colores primarios, deshace y limpia los trazos', (
@@ -321,19 +396,24 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Los permisos solo cambian su estado visual', (tester) async {
+  testWidgets('Permisos indica dónde activar el GPS y permite seguir al mapa', (
+    tester,
+  ) async {
     await abrirPermisos(tester);
-    for (final permiso in ['Ubicación', 'Cámara']) {
-      final boton = find.text('Simular permiso de $permiso');
-      await mostrar(tester, boton);
-      await tester.tap(boton);
-      await tester.pumpAndSettle();
-      expect(find.text('$permiso simulada'), findsOneWidget);
-    }
+    expect(
+      find.textContaining('En el mapa, toca «Usar mi ubicación»'),
+      findsOneWidget,
+    );
+    final boton = find.text('Simular permiso de Cámara');
+    await mostrar(tester, boton);
+    await tester.tap(boton);
+    await tester.pumpAndSettle();
+    expect(find.text('Cámara simulada'), findsOneWidget);
     await mostrar(tester, find.text('Comenzar a explorar'));
     await tester.tap(find.text('Comenzar a explorar'));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(AppBar, 'Mapa'), findsOneWidget);
+    expect(find.text('Usar mi ubicación'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -392,11 +472,11 @@ void main() {
     await mostrar(tester, find.text('Capturar'));
     await tester.tap(find.text('Capturar'));
     await tester.pumpAndSettle();
-    await mostrar(tester, find.text('Ver mis creaciones'));
-    await tester.tap(find.text('Ver mis creaciones'));
+    await mostrar(tester, find.text('Ver colección'));
+    await tester.tap(find.text('Ver colección'));
     await tester.pumpAndSettle();
-    expect(find.text('Crea tu criatura'), findsOneWidget);
-    await tester.tap(find.text('Mapa'));
+    expect(find.widgetWithText(AppBar, 'mis capturas'), findsOneWidget);
+    await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.widgetWithText(AppBar, 'Mapa'), findsOneWidget);
     expect(tester.takeException(), isNull);

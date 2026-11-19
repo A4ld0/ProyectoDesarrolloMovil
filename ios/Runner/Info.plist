@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Selecciona una foto para tu perfil.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Muestra tu posición en el mapa y la distancia a las criaturas cercanas.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -64,7 +64,11 @@ class EncyclopediaScreen extends StatelessWidget {
                         1,
                         0,
                       ]), //! matriz que convierte a escala de grises
-                child: Image.network(creature.imageUrl),
+                child: Image.network(
+                  creature.imageUrl,
+                  errorBuilder: (_, _, _) =>
+                      const Icon(Icons.image_not_supported_outlined),
+                ),
               ),
             ),
           );

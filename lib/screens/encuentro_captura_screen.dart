@@ -1,14 +1,50 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../data/criaturas_demo.dart';
+import '../data/criaturas_nfc.dart';
 import '../widgets/criatura_avatar.dart';
 
-class EncuentroCapturaScreen extends StatelessWidget {
+class EncuentroCapturaScreen extends StatefulWidget {
   const EncuentroCapturaScreen({super.key});
+
+  @override
+  State<EncuentroCapturaScreen> createState() => _EncuentroCapturaScreenState();
+}
+
+class _EncuentroCapturaScreenState extends State<EncuentroCapturaScreen> {
+  bool _guardando = false;
+
+  Future<void> _capturar(CriaturaDemo criatura, CriaturasNfc almacen) async {
+    if (_guardando) return;
+    if (almacen.pendiente(criatura)) {
+      setState(() => _guardando = true);
+      try {
+        await almacen.capturar(criatura);
+      } catch (_) {
+        if (mounted) {
+          setState(() => _guardando = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se pudo guardar la captura.')),
+          );
+        }
+        return;
+      }
+    }
+
+    if (mounted) {
+      Navigator.pushReplacementNamed(
+        context,
+        '/resultado',
+        arguments: criatura,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final almacen = context.watch<CriaturasNfc>();
     // Recibe la criatura que se tocó en el mapa.
     final criatura =
         ModalRoute.of(context)?.settings.arguments as CriaturaDemo? ??
@@ -46,14 +82,13 @@ class EncuentroCapturaScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(color: colors.onSurfaceVariant),
               ),
+              if (almacen.pendiente(criatura))
+                const Text('Recibida por NFC', textAlign: TextAlign.center),
               const SizedBox(height: 32),
               FilledButton.icon(
-                // La captura siempre tiene éxito en esta demostración.
-                onPressed: () => Navigator.pushReplacementNamed(
-                  context,
-                  '/resultado',
-                  arguments: criatura,
-                ),
+                onPressed: _guardando
+                    ? null
+                    : () => _capturar(criatura, almacen),
                 icon: const Icon(Icons.catching_pokemon),
                 label: const Text('Capturar'),
               ),

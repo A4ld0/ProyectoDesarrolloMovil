@@ -1,35 +1,135 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
-class CompartirRecibirScreen extends StatelessWidget {
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+
+import '../data/criaturas_demo.dart';
+import '../data/criaturas_nfc.dart';
+import '../data/intercambio_nfc.dart';
+
+enum _Modo { compartir, recibir }
+
+class CompartirRecibirScreen extends StatefulWidget {
   const CompartirRecibirScreen({super.key});
+
+  @override
+  State<CompartirRecibirScreen> createState() => _CompartirRecibirScreenState();
+}
+
+class _CompartirRecibirScreenState extends State<CompartirRecibirScreen>
+    with SingleTickerProviderStateMixin {
+  final _intercambio = IntercambioNfc();
+  late final TabController _pestanas;
+  late final AppLifecycleListener _cicloDeVida;
+  _Modo? _activo;
+  _Modo? _modoDelMensaje;
+  String? _mensaje;
+  CriaturaDemo? _recibida;
+
+  @override
+  void initState() {
+    super.initState();
+    _pestanas = TabController(length: _Modo.values.length, vsync: this)
+      ..addListener(_alCambiarPestana);
+    _cicloDeVida = AppLifecycleListener(onHide: _cancelar, onDetach: _cancelar);
+  }
+
+  void _alCambiarPestana() {
+    final activo = _activo;
+    if (activo != null && activo.index != _pestanas.index) _cancelar();
+  }
+
+  void _cancelar() => unawaited(_intercambio.cancelar());
+
+  @override
+  void dispose() {
+    _cicloDeVida.dispose();
+    _pestanas.dispose();
+    _cancelar();
+    super.dispose();
+  }
+
+  Future<void> _iniciar(_Modo modo, CriaturaDemo seleccion) async {
+    if (_activo != null) return;
+    final almacen = context.read<CriaturasNfc>();
+    setState(() {
+      _activo = modo;
+      _mensaje = null;
+      if (modo == _Modo.recibir) _recibida = null;
+    });
+
+    String? mensaje;
+    CriaturaDemo? recibida;
+    try {
+      if (modo == _Modo.compartir) {
+        if (await _intercambio.compartir(seleccion)) {
+          mensaje = '${seleccion.nombre} se envió correctamente.';
+        }
+      } else {
+        recibida = await _intercambio.recibir(almacen.recibir);
+        if (recibida != null) {
+          mensaje = almacen.pendiente(recibida)
+              ? '${recibida.nombre} llegó a tu mapa. Puedes capturarla allí.'
+              : '${recibida.nombre} ya está en tu colección.';
+        }
+      }
+    } on ErrorIntercambioNfc catch (error) {
+      mensaje = error.mensaje;
+    } on MissingPluginException {
+      mensaje = IntercambioNfc.mensajeSinNfc;
+    } on PlatformException {
+      mensaje =
+          'No se pudo iniciar el intercambio por NFC. Inténtalo de nuevo.';
+    } finally {
+      if (mounted) {
+        setState(() {
+          _activo = null;
+          _modoDelMensaje = modo;
+          _mensaje = mensaje;
+          if (modo == _Modo.recibir) _recibida = recibida;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final name =
-        ModalRoute.of(context)?.settings.arguments as String? ?? 'Nubin';
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Compartir y recibir'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Compartir', icon: Icon(Icons.ios_share)),
-              Tab(text: 'Recibir', icon: Icon(Icons.move_to_inbox_outlined)),
-            ],
-          ),
-        ),
-        body: TabBarView(
-          children: [
-            _panel(context, name, false),
-            _panel(context, 'Burbujin', true),
+    final argumento = ModalRoute.of(context)?.settings.arguments;
+    final criatura = argumento is CriaturaDemo
+        ? argumento
+        : criaturasDemo.first;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Compartir y recibir'),
+        bottom: TabBar(
+          controller: _pestanas,
+          tabs: const [
+            Tab(text: 'Compartir', icon: Icon(Icons.ios_share)),
+            Tab(text: 'Recibir', icon: Icon(Icons.move_to_inbox_outlined)),
           ],
         ),
+      ),
+      body: TabBarView(
+        controller: _pestanas,
+        children: [
+          _panel(_Modo.compartir, criatura),
+          _panel(_Modo.recibir, criatura),
+        ],
       ),
     );
   }
 
-  Widget _panel(BuildContext context, String name, bool receiving) {
-    final colors = Theme.of(context).colorScheme;
+  Widget _panel(_Modo modo, CriaturaDemo seleccion) {
+    final comparte = modo == _Modo.compartir;
+    final criatura = comparte ? seleccion : _recibida;
+    final sigueEnMapa = criatura == null || comparte
+        ? false
+        : context.watch<CriaturasNfc>().pendiente(criatura);
+    final colores = Theme.of(context).colorScheme;
+    final esperando = _activo == modo;
+    final mensaje = _modoDelMensaje == modo ? _mensaje : null;
+
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 600),
@@ -37,100 +137,73 @@ class CompartirRecibirScreen extends StatelessWidget {
           padding: const EdgeInsets.all(24),
           children: [
             Text(
-              receiving ? 'Recibe una criatura' : 'Comparte tu criatura',
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+              comparte ? 'Comparte tu criatura' : 'Recibe una criatura',
+              style: Theme.of(context).textTheme.headlineSmall,
             ),
-
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: colors.primaryContainer,
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    receiving ? Icons.water_drop_rounded : Icons.cloud_rounded,
-                    size: 100,
-                    color: colors.primary,
+            const SizedBox(height: 16),
+            if (criatura != null)
+              Card(
+                color: colores.primaryContainer,
+                child: ListTile(
+                  leading: Icon(
+                    criatura.icono,
+                    color: colores.onPrimaryContainer,
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    receiving
-                        ? 'Creada por Luna · Ejemplo'
-                        : 'Creada por ti · Ejemplo',
-                    style: TextStyle(color: colors.onSurfaceVariant),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            if (!receiving)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.info_outline, color: colors.primary),
-                title: const Text('Busca y captura'),
-                subtitle: const Text(
-                  'Al recibirla, podra aparecer en tu mapa. Capturala para tenerla en tu coleccion.',
+                  title: Text(criatura.nombre),
+                  subtitle: Text('Tipo ${criatura.tipo}'),
                 ),
               ),
-            const SizedBox(height: 20),
-            Card(
-              elevation: 0,
-              color: colors.primaryContainer,
-              child: ListTile(
-                leading: Icon(Icons.nfc, color: colors.primary),
-                title: const Text('Intercambio NFC'),
-                subtitle: const Text(
-                  'Demostración: el intercambio entre dos Android '
-                  'está pendiente. No se activa NFC ni se transfieren datos.',
-                ),
+            const SizedBox(height: 12),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.nfc),
+              title: const Text('Intercambio NFC'),
+              subtitle: Text(
+                comparte
+                    ? 'En el otro Android, abre Recibir y toca Buscar criatura.'
+                    : 'En el otro Android, abre Compartir y toca Empezar a compartir.',
               ),
             ),
             const SizedBox(height: 12),
             FilledButton.icon(
               icon: const Icon(Icons.nfc),
-              label: Text(receiving ? 'Probar recibir' : 'Probar compartir'),
-              onPressed: () => showDialog<void>(
-                context: context,
-                builder: (dialogContext) => AlertDialog(
-                  title: Text(
-                    receiving ? 'Recibir (prueba)' : 'Compartir (prueba)',
-                  ),
-                  content: Text(
-                    receiving
-                        ? 'Aquí se leerán por NFC los datos de una criatura '
-                              'compartida por otro Android. Después podrá '
-                              'aparecer en tu mapa para capturarla.\n\n'
-                              'Funcionalidad pendiente: por ahora, no se activa '
-                              'NFC, no se recibe ninguna criatura ni se guarda nada.'
-                        : 'Aquí se preparará a $name para compartirla con '
-                              'otro Android mediante NFC.\n\n'
-                              'Funcionalidad pendiente: la emisión desde el '
-                              'teléfono requiere una integración adicional. '
-                              'Por ahora, no se activa NFC ni se envían datos.',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      child: const Text('Entendido'),
-                    ),
-                  ],
-                ),
+              label: Text(comparte ? 'Empezar a compartir' : 'Buscar criatura'),
+              onPressed: _activo == null
+                  ? () => _iniciar(modo, seleccion)
+                  : null,
+            ),
+            if (esperando) ...[
+              const SizedBox(height: 12),
+              const LinearProgressIndicator(),
+              const SizedBox(height: 12),
+              Text(
+                'Mantén ambos teléfonos desbloqueados y acerca la parte trasera.',
+                style: TextStyle(color: colores.onSurfaceVariant),
               ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Volver a mis creaciones'),
-            ),
+              TextButton(
+                onPressed: _cancelar,
+                child: const Text('Cancelar intercambio'),
+              ),
+            ],
+            if (mensaje != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Semantics(liveRegion: true, child: Text(mensaje)),
+              ),
+            if (!comparte && criatura != null && mensaje != null)
+              OutlinedButton.icon(
+                icon: Icon(
+                  sigueEnMapa ? Icons.map_outlined : Icons.inventory_2_outlined,
+                ),
+                label: Text(sigueEnMapa ? 'Volver al mapa' : 'Ver colección'),
+                onPressed: () {
+                  final navegador = Navigator.of(context);
+                  navegador.popUntil(
+                    (route) => route.settings.name == '/mapa' || route.isFirst,
+                  );
+                  if (!sigueEnMapa) navegador.pushNamed('/coleccion');
+                },
+              ),
           ],
         ),
       ),
