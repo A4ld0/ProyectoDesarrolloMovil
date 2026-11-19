@@ -1,11 +1,12 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter/material.dart'; //° widgets de material
+import 'package:provider/provider.dart'; //° gestion de estado
 
-import '../data/datos_app.dart';
-import '../models/criatura.dart';
-import '../widgets/dibujo_criatura.dart';
-import '../widgets/recarga_firebase.dart';
+import '../data/datos_app.dart'; //° provider con firestore
+import '../models/criatura.dart'; //° modelo de criatura
+import '../widgets/dibujo_criatura.dart'; //° dibujo hecho en el editor
+import '../widgets/recarga_firebase.dart'; //° swipe down para recargar
 
+//! ficha de la criatura, se abre desde enciclopedia o coleccion
 class CreatureDetailScreen extends StatelessWidget {
   const CreatureDetailScreen({super.key, required this.creature});
   final Criatura creature;
@@ -13,6 +14,8 @@ class CreatureDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final datos = context.watch<DatosApp>();
+    //? se busca otra vez en el provider para mostrar la version mas nueva
+    //? si alguien la edito; si ya no existe se usa la que llego
     final criatura = datos.porId(creature.id) ?? creature;
     final colores = Theme.of(context).colorScheme;
     return Scaffold(
@@ -43,6 +46,7 @@ class CreatureDetailScreen extends StatelessWidget {
                   : 'Sin capturar',
             ),
             const SizedBox(height: 24),
+            //* manda la criatura a la pantalla de intercambio nfc
             if (datos.porId(criatura.id) != null)
               OutlinedButton.icon(
                 onPressed: () => Navigator.pushNamed(
