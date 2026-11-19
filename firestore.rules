@@ -1,0 +1,100 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function autenticado() {
+      return request.auth != null;
+    }
+    function propietario(uid) {
+      return autenticado() && request.auth.uid == uid;
+    }
+    function criaturaValida(datos) {
+      return datos.nombre is string && datos.nombre.size() > 0 && datos.nombre.size() <= 60
+        && datos.tipo is string && datos.tipo.size() > 0 && datos.tipo.size() <= 30
+        && datos.descripcion is string && datos.descripcion.size() <= 500
+        && datos.creadorId is string && datos.creadorId.size() > 0
+        && datos.dibujo is list && datos.dibujo.size() <= 300
+        && datos.simbolo is string && datos.simbolo.size() <= 30
+        && datos.version is int && datos.version > 0;
+    }
+    match /criaturas/{id} {
+      allow get: if autenticado();
+      allow list: if autenticado() && resource.data.creadorId == request.auth.uid;
+      allow create: if autenticado() && request.resource.data.creadorId == request.auth.uid
+        && criaturaValida(request.resource.data) && request.resource.data.version == 1
+        && request.resource.data.keys().hasOnly(['nombre', 'tipo', 'descripcion', 'creadorId', 'dibujo', 'simbolo', 'version', 'creadaEn', 'actualizadaEn']);
+      allow update: if autenticado() && resource.data.creadorId == request.auth.uid
+        && request.resource.data.creadorId == resource.data.creadorId
+        && request.resource.data.version == resource.data.version + 1
+        && criaturaValida(request.resource.data)
+        && request.resource.data.keys().hasOnly(['nombre', 'tipo', 'descripcion', 'creadorId', 'dibujo', 'simbolo', 'version', 'creadaEn', 'actualizadaEn']);
+      allow delete: if autenticado() && resource.data.creadorId == request.auth.uid;
+    }
+    match /usuarios/{uid} {
+      function perfilValido() {
+        let datos = request.resource.data;
+        return datos.uid == uid && datos.correo is string && datos.correo.size() <= 320
+          && datos.nombre is string && datos.nombre.size() <= 60 && datos.sonidos is bool
+          && datos.keys().hasOnly(['uid', 'correo', 'nombre', 'sonidos', 'creadoEn', 'ultimoAcceso', 'capturasLocalesImportadas']);
+      }
+      allow read: if propietario(uid);
+      allow create, update: if propietario(uid) && perfilValido();
+      match /capturas/{id} {
+        allow read: if propietario(uid);
+        allow create, update: if propietario(uid)
+          && request.resource.data.keys().hasOnly(['estado', 'origen', 'criatura', 'actualizadaEn'])
+          && request.resource.data.estado in ['recibida', 'capturada']
+          && request.resource.data.origen in ['mapa', 'nfc']
+          && criaturaValida(request.resource.data.criatura)
+          && exists(/databases/$(database)/documents/criaturas/$(id));
+      }
+      match /apariciones/{id} {
+        allow read: if propietario(uid);
+        allow create: if propietario(uid)
+          && exists(/databases/$(database)/documents/criaturas/$(id))
+          && request.resource.data.keys().hasOnly(['latitud', 'longitud'])
+          && request.resource.data.latitud is number && request.resource.data.latitud >= -90 && request.resource.data.latitud <= 90
+          && request.resource.data.longitud is number && request.resource.data.longitud >= -180 && request.resource.data.longitud <= 180;
+      }
+      match /dispositivos/{id} {
+        allow read, delete: if propietario(uid);
+        allow create, update: if propietario(uid)
+          && request.resource.data.token == id && id.size() <= 1500
+          && request.resource.data.plataforma in ['android', 'iOS']
+          && request.resource.data.keys().hasOnly(['token', 'plataforma', 'actualizadoEn']);
+      }
+    }
+    match /perfilesPublicos/{uid} {
+      allow get: if autenticado();
+      allow create, update: if propietario(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.nombre is string && request.resource.data.nombre.size() <= 60
+        && request.resource.data.keys().hasOnly(['uid', 'nombre']);
+    }
+    match /amistades/{id} {
+      allow get: if autenticado()
+        && (!exists(/databases/$(database)/documents/amistades/$(id))
+          || request.auth.uid in resource.data.miembros);
+      allow list: if autenticado() && request.auth.uid in resource.data.miembros;
+      allow create: if autenticado()
+        && request.resource.data.emisorId == request.auth.uid
+        && request.resource.data.receptorId != request.auth.uid
+        && request.resource.data.receptorId is string
+        && exists(/databases/$(database)/documents/perfilesPublicos/$(request.resource.data.receptorId))
+        && request.resource.data.miembros is list
+        && request.resource.data.miembros.size() == 2
+        && request.resource.data.miembros.hasAll([request.resource.data.emisorId, request.resource.data.receptorId])
+        && request.resource.data.estado == 'pendiente'
+        && request.resource.data.keys().hasOnly(['miembros', 'emisorId', 'receptorId', 'estado', 'creadaEn']);
+      allow update: if autenticado()
+        && resource.data.receptorId == request.auth.uid
+        && resource.data.estado == 'pendiente'
+        && request.resource.data.estado == 'aceptada'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado']);
+      allow delete: if autenticado() && request.auth.uid in resource.data.miembros;
+    }
+    // Conserva el acceso preexistente a la colección ajena a este juego.
+    match /products/{document=**} {
+      allow read, write: if request.time < timestamp.date(2026, 12, 5);
+    }
+  }
+}
